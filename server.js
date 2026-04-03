@@ -19,6 +19,15 @@ app.use('/auth', authRoutes);
 // General data endpoints protected by custom generic session headers
 app.use('/api', apiRoutes);
 
+// Root Endpoint for deployment verification
+app.get('/', (req, res) => {
+    res.json({
+        status: "success",
+        message: "ITS College Backend API is successfully running on Vercel 🚀",
+        endpoints: ["/auth/login", "/auth/logout", "/api/profile", "/api/attendance/overall", "/api/timetable"]
+    });
+});
+
 // Global unhandled error handler
 app.use((err, req, res, next) => {
     console.error('[System Fault Error]', err);
