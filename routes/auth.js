@@ -62,16 +62,23 @@ router.post('/login', async (req, res) => {
  * Return the currently logged-in user details from the database.
  */
 router.get('/me', async (req, res) => {
-    const sessionId = req.headers['authorization'];
+    let sessionId = req.headers['authorization'];
     
     if (!sessionId) {
         return res.status(401).json({ error: 'No authorization session found' });
+    }
+
+    // Clean up "Bearer " prefix if it exists
+    if (sessionId.startsWith('Bearer ')) {
+        sessionId = sessionId.slice(7);
     }
 
     const session = sessionStore.decrypt(sessionId);
     if (!session || !session.user_id) {
         return res.status(401).json({ error: 'Invalid or expired session' });
     }
+
+    console.log(`📡 Fetching personal profile for user_id: ${session.user_id}`);
 
     try {
         const user = await getUserById(session.user_id);
@@ -81,9 +88,11 @@ router.get('/me', async (req, res) => {
 
         res.json({ user });
     } catch (error) {
+        console.error('❌ Internal server error in /me:', error);
         res.status(500).json({ error: 'Error retrieving user data' });
     }
 });
+
 
 /**
  * POST /auth/logout
