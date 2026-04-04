@@ -89,4 +89,25 @@ async function secureFetch(endpoint, sessionId, res = null, method = 'GET', body
     return data;
 }
 
-module.exports = { loginUser, secureFetch };
+/**
+ * Fetch the user's profile data using a valid JWT token.
+ */
+async function getUserProfile(token) {
+    const response = await fetch(`${API_BASE}/profile`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to fetch profile: ${text.substring(0, 50)}...`);
+    }
+
+    const data = await response.json();
+    return data.data || data; // Handle variations in API response wrapping
+}
+
+module.exports = { loginUser, secureFetch, getUserProfile };
+
