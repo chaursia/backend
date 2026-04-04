@@ -1,6 +1,6 @@
 const express = require('express');
 const { getQR, scanQR } = require('../services/idService');
-const { getUserById } = require('../services/authService');
+const { getUserById, getUserByCollegeId } = require('../services/authService');
 const sessionStore = require('../utils/sessionStore');
 
 const router = express.Router();
@@ -11,40 +11,41 @@ const router = express.Router();
  */
 router.get('/getQR', async (req, res) => {
     let sessionId = req.headers['authorization'];
+    const collegeIdParam = req.query.collegeId;
+    let userId;
 
-    if (!sessionId) {
-        console.warn('⚠️ No Authorization header provided for getQR');
-        return res.status(401).json({ error: 'Unauthorized: No session token provided' });
+    if (sessionId) {
+        // Clean up "Bearer " prefix if it exists
+        if (sessionId.toLowerCase().startsWith('bearer ')) {
+            sessionId = sessionId.slice(7);
+        }
+        const session = sessionStore.decrypt(sessionId);
+        if (session && session.user_id) {
+            userId = session.user_id;
+        }
     }
-
-    // Clean up "Bearer " prefix if it exists (case-insensitive)
-    if (sessionId.toLowerCase().startsWith('bearer ')) {
-        sessionId = sessionId.slice(7);
-    }
-
-
-    const session = sessionStore.decrypt(sessionId);
-    if (!session || !session.user_id) {
-        console.error('❌ Failed to decrypt session inside getQR');
-        return res.status(401).json({ error: 'Unauthorized: Invalid or expired session' });
-    }
-
-    console.log(`📡 Fetching QR for user_id: ${session.user_id}`);
 
     try {
-        const user = await getUserById(session.user_id);
+        let user;
+        if (userId) {
+            user = await getUserById(userId);
+        } else if (collegeIdParam) {
+            // Fallback: Fetch by collegeId (Roll No) if session decryption fails
+            user = await getUserByCollegeId(collegeIdParam);
+        }
+
         if (!user) {
-            console.warn(`⚠️ User profile not found in DB for user_id: ${session.user_id}`);
-            return res.status(404).json({ error: 'User profile not found in synced database' });
+            return res.status(401).json({ error: 'Unauthorized: No valid session or collegeId provided' });
         }
 
         const qrData = getQR(user.college_id);
         res.json({ qrData });
     } catch (error) {
-        console.error('❌ Internal server error in getQR:', error);
+        console.error('❌ Error in getQR:', error);
         res.status(500).json({ error: 'Failed to generate QR data' });
     }
 });
+
 
 
 /**

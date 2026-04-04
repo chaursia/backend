@@ -91,4 +91,16 @@ async function getUserById(id) {
     return result.rows[0];
 }
 
-module.exports = { loginAndSync, getUserById };
+/**
+ * getUserByCollegeId: Search for a student by their Roll Number or College ID.
+ */
+async function getUserByCollegeId(collegeId) {
+    const result = await db.execute({
+        sql: 'SELECT * FROM users WHERE roll_no = ? OR college_id = ?',
+        args: [collegeId, collegeId]
+    });
+    return result.rows[0];
+}
+
+module.exports = { loginAndSync, getUserById, getUserByCollegeId };
+
