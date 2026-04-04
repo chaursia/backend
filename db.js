@@ -44,7 +44,20 @@ async function initDb() {
   }
 }
 
+/**
+ * Test the database connection.
+ */
+async function checkConnection() {
+  try {
+    const result = await db.execute("SELECT 1");
+    return { status: "connected", message: "Successfully connected to Turso" };
+  } catch (error) {
+    return { status: "error", message: error.message };
+  }
+}
+
 // Automatically init DB on start
 initDb();
 
-module.exports = db;
+module.exports = { db, checkConnection };
+

@@ -1,7 +1,18 @@
+const { checkConnection } = require('../db');
 const { loginAndSync, getUserById } = require('../services/authService');
 const sessionStore = require('../utils/sessionStore');
 
 const router = express.Router();
+
+/**
+ * GET /auth/status
+ * Check the record connection status.
+ */
+router.get('/status', async (req, res) => {
+    const status = await checkConnection();
+    res.json(status);
+});
+
 
 /**
  * POST /auth/login
