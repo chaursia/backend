@@ -1,15 +1,15 @@
 const express = require('express');
-const { generateQR, verifyScan } = require('../services/idService');
+const { getQR, scanQR } = require('../services/idService');
 const { getUserById } = require('../services/authService');
 const sessionStore = require('../utils/sessionStore');
 
 const router = express.Router();
 
 /**
- * GET /id/qr
+ * GET /id/getQR
  * Generates a QR payload for the currently logged-in student.
  */
-router.get('/qr', async (req, res) => {
+router.get('/getQR', async (req, res) => {
     const sessionId = req.headers['authorization'];
 
     if (!sessionId) {
@@ -22,15 +22,12 @@ router.get('/qr', async (req, res) => {
     }
 
     try {
-        // Fetch current user from DB to get their college_id
         const user = await getUserById(session.user_id);
         if (!user) {
             return res.status(404).json({ error: 'User profile not found' });
         }
 
-        // Generate the Base64 QR payload
-        const qrData = generateQR(user.college_id);
-
+        const qrData = getQR(user.college_id);
         res.json({ qrData });
     } catch (error) {
         res.status(500).json({ error: 'Failed to generate QR data' });
@@ -38,10 +35,10 @@ router.get('/qr', async (req, res) => {
 });
 
 /**
- * POST /id/scan
+ * POST /id/scanQR
  * Decodes and verifies a QR code payload, returning safe student profile data.
  */
-router.post('/scan', async (req, res) => {
+router.post('/scanQR', async (req, res) => {
     const { qrData } = req.body;
 
     if (!qrData) {
@@ -49,11 +46,9 @@ router.post('/scan', async (req, res) => {
     }
 
     try {
-        // Decode and verify the scan
-        const verifiedResult = await verifyScan(qrData);
+        const verifiedResult = await scanQR(qrData);
         res.json(verifiedResult);
     } catch (error) {
-        // Distinguish between handled validation errors and unknown system errors
         const isValidationError = error.message.includes('Invalid QR') || error.message.includes('Verification failed');
         res.status(isValidationError ? 400 : 500).json({ 
             error: error.message || 'Verification process encountered an unexpected error.' 
@@ -62,3 +57,4 @@ router.post('/scan', async (req, res) => {
 });
 
 module.exports = router;
+

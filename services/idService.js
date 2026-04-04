@@ -1,9 +1,9 @@
 const { db } = require('../db');
 
 /**
- * Generate a Base64 encoded JSON payload for the QR code.
+ * getQR: Generate a Base64 encoded JSON payload for the QR code.
  */
-function generateQR(collegeId) {
+function getQR(collegeId) {
     const payload = {
         id: collegeId,
         ts: Date.now()
@@ -15,9 +15,9 @@ function generateQR(collegeId) {
 }
 
 /**
- * Decode and verify a QR payload, returning the student's safe profile data.
+ * scanQR: Decode and verify a QR payload, returning the student's safe profile data.
  */
-async function verifyScan(qrData) {
+async function scanQR(qrData) {
     let payload;
     
     // 1. Decode Base64 safely
@@ -53,10 +53,10 @@ async function verifyScan(qrData) {
             profile: user
         };
     } catch (error) {
-        // Log sensitive database errors but throw clean UI-friendly errors
         console.error('❌ ID Scan Database Error:', error.message);
         throw error;
     }
 }
 
-module.exports = { generateQR, verifyScan };
+module.exports = { getQR, scanQR };
+
