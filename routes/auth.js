@@ -68,10 +68,11 @@ router.get('/me', async (req, res) => {
         return res.status(401).json({ error: 'No authorization session found' });
     }
 
-    // Clean up "Bearer " prefix if it exists
-    if (sessionId.startsWith('Bearer ')) {
+    // Clean up "Bearer " prefix if it exists (case-insensitive)
+    if (sessionId.toLowerCase().startsWith('bearer ')) {
         sessionId = sessionId.slice(7);
     }
+
 
     const session = sessionStore.decrypt(sessionId);
     if (!session || !session.user_id) {
