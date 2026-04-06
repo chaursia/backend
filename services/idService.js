@@ -15,35 +15,47 @@ function getQR(collegeId) {
 }
 
 /**
- * scanQR: Decode and verify a QR payload, returning the student's safe profile data.
+ * scanQR: Decode and verify a QR payload or raw physical barcode.
+ * Returns the student's safe profile data if found.
  */
 async function scanQR(qrData) {
     let payload;
+    let isDigitalQR = false;
     
-    // 1. Decode Base64 safely
+    // 1. Detect format (Digital QR vs Physical Barcode)
     try {
+        // Digital QRs are Base64 encoded JSON
         const decodedString = Buffer.from(qrData, 'base64').toString('utf-8');
         payload = JSON.parse(decodedString);
+        if (payload && payload.id) {
+            isDigitalQR = true;
+        }
     } catch (error) {
-        throw new Error('Invalid QR Data: could not decode payload');
+        // Not a valid Digital QR, treat as raw Physical Barcode
+        console.log(`📡 Scan detected as raw physical barcode: ${qrData}`);
     }
 
-    // 2. Validate essential fields
-    if (!payload.id) {
-        throw new Error('Invalid QR Data: missing identifier');
-    }
-
-    // 3. Fetch user from Turso using college_id
+    // 2. Fetch user based on detected format
     try {
+        const query = isDigitalQR 
+            ? `SELECT name, roll_no, course, branch, semester, phone, email, profile_image 
+               FROM users WHERE college_id = ?`
+            : `SELECT name, roll_no, course, branch, semester, phone, email, profile_image 
+               FROM users WHERE barcode_id = ?`;
+        
+        const searchValue = isDigitalQR ? payload.id : qrData;
+
         const result = await db.execute({
-            sql: `SELECT name, roll_no, course, branch, semester, phone, email, profile_image 
-                  FROM users WHERE college_id = ?`,
-            args: [payload.id]
+            sql: query,
+            args: [searchValue]
         });
 
         const user = result.rows[0];
         if (!user) {
-            throw new Error('Verification failed: Student not found in database');
+            const errorMsg = isDigitalQR 
+                ? 'Verification failed: Student not found for this Digital ID'
+                : 'Verification failed: Physical barcode not recognized';
+            throw new Error(errorMsg);
         }
 
         // Return the safe profile data
