@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const appRoutes = require('./routes/app');
 const idRoutes = require('./routes/id');
+const profileRoutes = require('./routes/profile');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,9 @@ app.use('/app', appRoutes);
 
 // Digital Student ID QR system
 app.use('/id', idRoutes);
+
+// Profile completion system
+app.use('/profile', profileRoutes);
 
 
 // Root Endpoint for deployment verification

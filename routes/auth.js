@@ -48,7 +48,8 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 roll_no: user.roll_no,
                 email: user.email,
-                profile_image: user.profile_image
+                profile_image: user.profile_image,
+                profile_complete: !!user.profile_complete
             }
         });
     } catch (error) {
@@ -87,7 +88,10 @@ router.get('/me', async (req, res) => {
             return res.status(404).json({ error: 'User not found in local database' });
         }
 
-        res.json({ user });
+        res.json({ 
+            user,
+            profile_complete: !!user.profile_complete
+        });
     } catch (error) {
         console.error('❌ Internal server error in /me:', error);
         res.status(500).json({ error: 'Error retrieving user data' });

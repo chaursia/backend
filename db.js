@@ -34,6 +34,8 @@ async function initDb() {
         email TEXT,
         phone TEXT,
         profile_image TEXT,
+        barcode_id TEXT UNIQUE,
+        profile_complete BOOLEAN DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
