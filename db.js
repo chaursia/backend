@@ -50,12 +50,14 @@ async function initDb() {
 
     for (const sql of columns) {
       try {
+        console.log(`🛠️ Attempting migration: ${sql}`);
         await db.execute(sql);
-        console.log(`✅ Database Migration: ${sql.split('ADD COLUMN ')[1]} added.`);
+        console.log(`✅ Migration Success: ${sql.split('ADD COLUMN ')[1]} added.`);
       } catch (e) {
-        // Ignore "duplicate column name" or "already exists" errors
-        if (!e.message.toLowerCase().includes("duplicate") && !e.message.toLowerCase().includes("already exists")) {
-          // console.warn('⚠️ Migration notice:', e.message);
+        if (e.message.toLowerCase().includes("duplicate") || e.message.toLowerCase().includes("already exists")) {
+          console.log(`⏩ Skipping duplicate column: ${sql.split('ADD COLUMN ')[1]}`);
+        } else {
+          console.error(`❌ Migration Critical Error: ${sql} | ${e.message}`);
         }
       }
     }
