@@ -88,11 +88,27 @@ router.get('/me', async (req, res) => {
             return res.status(404).json({ error: 'User not found in local database' });
         }
 
+        // Map database fields to the format expected by the app (ProfileResponse)
+        const mappedUser = {
+            id: user.id,
+            fullName: user.name,
+            rollNo: user.roll_no,
+            studentId: user.college_id,
+            email: user.email,
+            mobile: user.phone,
+            course: { courseFullName: user.course },
+            branch: { branchFullName: user.branch },
+            currentSemester: user.semester,
+            currentSection: user.section,
+            picture: user.profile_image,  // Map profile_image to picture
+            barcode_id: user.barcode_id
+        };
+
         // A profile is complete only if profile_complete is true AND they have a barcode bound.
         const isActuallyComplete = !!user.profile_complete && !!user.barcode_id;
 
         res.json({ 
-            user,
+            user: mappedUser,
             profile_complete: isActuallyComplete
         });
     } catch (error) {
