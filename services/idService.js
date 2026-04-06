@@ -43,7 +43,7 @@ async function scanQR(qrData) {
             : `SELECT name, roll_no, course, branch, semester, phone, email, profile_image 
                FROM users WHERE barcode_id = ?`;
         
-        const searchValue = isDigitalQR ? payload.id : qrData;
+        const searchValue = isDigitalQR ? payload.id : qrData.trim();
 
         const result = await db.execute({
             sql: query,
