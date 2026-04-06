@@ -41,13 +41,22 @@ async function initDb() {
       );
     `);
 
-    // Safeguard: Ensure profile_complete column exists if table was created previously
-    try {
-      await db.execute("ALTER TABLE users ADD COLUMN profile_complete BOOLEAN DEFAULT 0");
-      console.log('✅ Added profile_complete column');
-    } catch (e) {
-      if (!e.message.includes("duplicate column name")) {
-        console.warn('⚠️ Column check warning:', e.message);
+    // Safeguard: Ensure required columns exist if table was created previously
+    const columns = [
+      "ALTER TABLE users ADD COLUMN barcode_id TEXT UNIQUE",
+      "ALTER TABLE users ADD COLUMN profile_complete BOOLEAN DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN profile_image TEXT"
+    ];
+
+    for (const sql of columns) {
+      try {
+        await db.execute(sql);
+        console.log(`✅ Database Migration: ${sql.split('ADD COLUMN ')[1]} added.`);
+      } catch (e) {
+        // Ignore "duplicate column name" or "already exists" errors
+        if (!e.message.toLowerCase().includes("duplicate") && !e.message.toLowerCase().includes("already exists")) {
+          // console.warn('⚠️ Migration notice:', e.message);
+        }
       }
     }
 
