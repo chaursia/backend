@@ -104,8 +104,8 @@ router.get('/me', async (req, res) => {
             barcode_id: user.barcode_id
         };
 
-        // A profile is complete only if profile_complete is true AND they have a barcode bound.
-        const isActuallyComplete = !!user.profile_complete && !!user.barcode_id;
+        // A profile is complete only if profile_complete flag is set AND they have both a barcode and a profile image.
+        const isActuallyComplete = !!user.profile_complete && !!user.barcode_id && !!user.profile_image;
 
         res.json({ 
             user: mappedUser,
