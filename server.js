@@ -27,6 +27,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // to parse form bodies
 app.use(cookieParser());
 
+// Global Middleware to catch misplaced Supabase OAuth codes (Whitelist fallback)
+app.use((req, res, next) => {
+    if (req.query.code && (req.path === '/' || req.path === '/admin')) {
+        console.log(`[Smart Redirect] Catching OAuth code at ${req.path}, forwarding to admin callback.`);
+        return res.redirect(`/admin/auth/callback?code=${req.query.code}`);
+    }
+    next();
+});
+
 // Active Request Logger (shows up in your Admin Server Logs)
 app.use((req, res, next) => {
     if (!req.url.match(/\.(css|js|png|jpg|jpeg|gif|ico|svg)$/)) {
@@ -57,12 +66,6 @@ app.use('/admin', adminRoutes);
 
 // Root Endpoint for deployment verification
 app.get('/', (req, res) => {
-    // SMART REDIRECT: If Supabase redirects here with a code (due to whitelist mismatch), 
-    // forward it to the admin callback automatically.
-    if (req.query.code) {
-        return res.redirect(`/admin/auth/callback?code=${req.query.code}`);
-    }
-
     res.json({
         status: "success",
         message: "ITS College Backend API is successfully running on Vercel 🚀",
