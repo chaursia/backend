@@ -129,4 +129,14 @@
     </main>
 </div>
 
-<%- include('partials/footer') %>
+<script>
+    if (window.lucide) {
+        // Find all data-feather and convert to data-lucide for API compatibility
+        document.querySelectorAll('[data-feather]').forEach(el => {
+            el.setAttribute('data-lucide', el.getAttribute('data-feather'));
+        });
+        lucide.createIcons();
+    }
+</script>
+</body>
+</html>
