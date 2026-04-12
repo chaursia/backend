@@ -132,16 +132,27 @@ router.get('/me', async (req, res) => {
             return res.status(404).json({ error: 'User not found. Your account might have been deleted.' });
         }
 
-        // ✅ Check Admin Bans (Force logout on mobile app if banned mid-session)
-        const { data: ban } = await supabase
-            .from('user_bans')
-            .select('reason, expires_at')
-            .eq('college_id', user.college_id)
-            .eq('is_active', true)
-            .single();
+        // ✅ Check Admin Bans & Maintenance Mode
+        const [banRes, settingsRes] = await Promise.all([
+            supabase
+                .from('user_bans')
+                .select('reason, expires_at')
+                .eq('college_id', user.college_id)
+                .eq('is_active', true)
+                .single(),
+            supabase
+                .from('feature_settings')
+                .select('maintenance_mode, maintenance_message')
+                .eq('id', 1)
+                .single()
+        ]);
 
-        if (ban) {
-            return res.status(403).json({ error: 'Your account has been suspended.', reason: ban.reason });
+        if (settingsRes.data && settingsRes.data.maintenance_mode) {
+            return res.status(503).json({ error: settingsRes.data.maintenance_message || 'System is currently under maintenance.' });
+        }
+
+        if (banRes.data) {
+            return res.status(403).json({ error: 'Your account has been suspended.', reason: banRes.data.reason });
         }
 
         // Map database fields to the format expected by the app (ProfileResponse)

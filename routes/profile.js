@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const sessionStore = require('../utils/sessionStore');
 const { completeProfile, bindBarcode } = require('../services/profileService');
+const { supabase } = require('../db');
 
 const router = express.Router();
 
@@ -51,6 +52,15 @@ router.post('/complete', authenticate, upload.fields([
     { name: 'idCardImage', maxCount: 1 }
 ]), async (req, res) => {
     try {
+        // ✅ Check maintenance mode before allowing profile uploads
+        const { data: features } = await supabase
+            .from('feature_settings')
+            .select('maintenance_mode, maintenance_message')
+            .eq('id', 1).single();
+        if (features?.maintenance_mode) {
+            return res.status(503).json({ error: features.maintenance_message || 'System is under maintenance.' });
+        }
+
         const profileImage = req.files['profileImage'] ? req.files['profileImage'][0] : null;
         const idCardImage = req.files['idCardImage'] ? req.files['idCardImage'][0] : null;
         const { confirmedBarcode } = req.body;
@@ -62,7 +72,7 @@ router.post('/complete', authenticate, upload.fields([
         const result = await completeProfile(req.userId, profileImage, idCardImage, confirmedBarcode);
         
         if (!result.success) {
-            return res.status(200).json(result); // Return 200 to handle fallback gracefully in frontend
+            return res.status(200).json(result);
         }
 
         res.json(result);
@@ -84,6 +94,18 @@ router.post('/bind-barcode', authenticate, async (req, res) => {
     }
 
     try {
+        // ✅ Check barcode feature toggle (controlled by Admin Panel)
+        const { data: features } = await supabase
+            .from('feature_settings')
+            .select('barcode_enabled, maintenance_mode, maintenance_message')
+            .eq('id', 1).single();
+        if (features?.maintenance_mode) {
+            return res.status(503).json({ error: features.maintenance_message || 'System is under maintenance.' });
+        }
+        if (features && !features.barcode_enabled) {
+            return res.status(403).json({ error: 'Barcode ID binding is currently disabled by the administrator.' });
+        }
+
         const result = await bindBarcode(req.userId, barcode);
         res.json(result);
     } catch (error) {

@@ -2,14 +2,34 @@ const express = require('express');
 const { getQR, scanQR } = require('../services/idService');
 const { getUserById, getUserByCollegeId } = require('../services/authService');
 const sessionStore = require('../utils/sessionStore');
+const { supabase } = require('../db');
 
 const router = express.Router();
 
 /**
  * GET /id/getQR
  * Generates a QR payload for the currently logged-in student.
+ * Checks: qr_enabled flag, user ban status.
  */
 router.get('/getQR', async (req, res) => {
+    // Check Admin Feature Toggle for QR
+    try {
+        const { data: features } = await supabase
+            .from('feature_settings')
+            .select('qr_enabled, maintenance_mode, maintenance_message')
+            .eq('id', 1)
+            .single();
+
+        if (features) {
+            if (features.maintenance_mode) {
+                return res.status(503).json({ error: features.maintenance_message || 'System is under maintenance.' });
+            }
+            if (!features.qr_enabled) {
+                return res.status(403).json({ error: 'QR ID generation is currently disabled by the administrator.' });
+            }
+        }
+    } catch (e) { /* Non-fatal: allow if DB is unreachable */ }
+
     let sessionId = req.headers['authorization'];
     const collegeIdParam = req.query.collegeId;
     let userId;
