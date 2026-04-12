@@ -1,3 +1,4 @@
+const { db } = require('../db');
 const { loginUser, getUserProfile } = require('./apiService');
 const { sendWelcomeEmail } = require('../utils/mailer');
 const { logActivity } = require('../utils/activityLogger');
