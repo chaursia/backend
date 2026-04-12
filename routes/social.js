@@ -250,4 +250,33 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
     }
 });
 
+/**
+ * POST /social/post/:id/repost
+ * Creates a new post record marking it as a repost.
+ */
+router.post('/post/:id/repost', requireSocialAccess, async (req, res) => {
+    try {
+        const originalPostId = req.params.id;
+        
+        // 1. Verify original exists
+        const original = await db.execute({ 
+            sql: `SELECT 1 FROM social_posts WHERE id = ?`, 
+            args: [originalPostId] 
+        });
+        if (original.rows.length === 0) return res.status(404).json({ error: 'Original post not found.' });
+
+        // 2. Create the repost
+        const repostId = crypto.randomUUID();
+        await db.execute({
+            sql: `INSERT INTO social_posts (id, user_id, original_post_id, is_repost) VALUES (?, ?, ?, 1)`,
+            args: [repostId, req.userId, originalPostId]
+        });
+
+        res.json({ success: true, message: 'Post reposted.' });
+    } catch (e) {
+        console.error("Repost Error:", e);
+        res.status(500).json({ error: 'Failed to repost.' });
+    }
+});
+
 module.exports = router;
