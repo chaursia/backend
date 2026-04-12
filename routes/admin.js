@@ -7,12 +7,20 @@ const { logActivity } = require('../utils/activityLogger');
 const { sendBulkEmail, sendPersonalizedEmail, checkSmtpConnection } = require('../utils/mailer');
 const multer = require('multer');
 const fs = require('fs');
+const crypto = require('crypto');
+const { uploadToCloudinary } = require('../services/cloudinaryService');
 
 // Configure Multer for email attachments
 // NOTE: Use /tmp for Vercel serverless compatibility (read-only filesystem)
 const upload = multer({ 
     dest: '/tmp/mail-temp/',
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit per file
+});
+
+// Configure Multer for social uploads (Memory storage)
+const socialUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 const router = express.Router();
@@ -105,6 +113,31 @@ async function getAppSettings() {
     } catch (e) {
         console.error('Critical: Failed to fetch App Settings from Supabase:', e.message);
         return { version: '0.0.0', force: false, message: 'System error fetching settings.', download_url: '#' };
+    }
+}
+
+/**
+ * Ensures the SYSTEM_ADMIN user exists in Turso for social posting.
+ */
+async function ensureAdminUser() {
+    try {
+        const adminRes = await db.execute({
+            sql: "SELECT id FROM users WHERE college_id = 'SYSTEM_ADMIN'",
+            args: []
+        });
+
+        if (adminRes.rows.length === 0) {
+            console.log('[Admin] Initializing SYSTEM_ADMIN record...');
+            await db.execute({
+                sql: "INSERT INTO users (college_id, name, profile_image, profile_complete) VALUES ('SYSTEM_ADMIN', 'Official Admin', '', 1)",
+                args: []
+            });
+            return await ensureAdminUser(); // Recursive call to get the new ID
+        }
+        return adminRes.rows[0].id;
+    } catch (e) {
+        console.error('[Admin] Failed to ensure admin user:', e.message);
+        return null;
     }
 }
 
@@ -797,6 +830,95 @@ router.get('/health', async (req, res) => {
             checkedAt: new Date().toLocaleString('en-IN'),
         }
     });
+});
+
+// ─────────────────────────────────────────────
+//  ADMIN PROFILE & SOCIAL HUB
+// ─────────────────────────────────────────────
+
+router.get('/profile', async (req, res) => {
+    try {
+        await ensureAdminUser();
+        const adminRes = await db.execute("SELECT * FROM users WHERE college_id = 'SYSTEM_ADMIN'");
+        res.render('admin-profile', { 
+            adminItem: adminRes.rows[0],
+            flash: req.query.success ? { type: 'success', message: 'Profile updated successfully' } : null
+        });
+    } catch (err) {
+        res.status(500).send('Error loading admin profile');
+    }
+});
+
+router.post('/profile', socialUpload.single('profileImage'), async (req, res) => {
+    const { name } = req.body;
+    try {
+        let profileImageUrl = null;
+        if (req.file) {
+            const uploadResult = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
+            profileImageUrl = uploadResult.url;
+        }
+
+        if (profileImageUrl) {
+            await db.execute({
+                sql: "UPDATE users SET name = ?, profile_image = ? WHERE college_id = 'SYSTEM_ADMIN'",
+                args: [name, profileImageUrl]
+            });
+        } else {
+            await db.execute({
+                sql: "UPDATE users SET name = ? WHERE college_id = 'SYSTEM_ADMIN'",
+                args: [name]
+            });
+        }
+
+        await logAudit(req.adminUser, 'update_admin_profile', 'system', 'SYSTEM_ADMIN', { name });
+        res.redirect('/admin/profile?success=1');
+    } catch (err) {
+        res.status(500).send('Update failed: ' + err.message);
+    }
+});
+
+router.get('/social/post', (req, res) => {
+    res.render('admin-post-form', { 
+        flash: req.query.success ? { type: 'success', message: 'Post published to Social Hub!' } : null
+    });
+});
+
+router.post('/social/post', socialUpload.single('media'), async (req, res) => {
+    const { content } = req.body;
+    try {
+        const adminUserId = await ensureAdminUser();
+        if (!adminUserId) throw new Error('Could not identify system admin user.');
+
+        let mediaUrl = null;
+        let mediaType = null;
+        let publicId = null;
+
+        if (req.file) {
+            const uploadResult = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
+            mediaUrl = uploadResult.url;
+            mediaType = uploadResult.type;
+            publicId = uploadResult.public_id;
+        }
+
+        const postId = crypto.randomUUID();
+        await db.execute({
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type) VALUES (?, ?, ?, ?, ?)`,
+            args: [postId, adminUserId, content || '', publicId ? `${mediaUrl}|${publicId}` : mediaUrl, mediaType]
+        });
+
+        await logAudit(req.adminUser, 'admin_social_post', 'post', postId, { content: (content || '').substring(0, 50) });
+        
+        // Log to Activity Feed
+        logActivity('social', 'Official Admin Post', 'A new official update has been posted to the Social Hub.', {
+            icon: 'message-square',
+            color: 'purple'
+        }).catch(() => {});
+
+        res.redirect('/admin/social/post?success=1');
+    } catch (err) {
+        console.error('Admin Post Error:', err);
+        res.status(500).send('Failed to create post: ' + err.message);
+    }
 });
 
 // ─────────────────────────────────────────────
