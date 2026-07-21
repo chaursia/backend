@@ -37,25 +37,78 @@
 ]</code></pre>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-2xl">
-            <form method="POST" action="/admin/faculty/import">
-                <div>
-                    <label class="text-sm font-semibold text-gray-700 block mb-1.5">JSON Data <span class="text-red-500">*</span></label>
-                    <textarea name="jsonData" rows="15" class="w-full text-sm font-mono border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" required placeholder='[
-  {
-    "employee_id": "FAC001",
-    "name": "Dr. John Smith",
-    "designation": "Professor",
-    "department": "Computer Science",
-    ...
-  }
-]'></textarea>
-                </div>
-                <button type="submit" class="mt-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors shadow-sm">Import Faculty</button>
-            </form>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Upload JSON File
+                </h3>
+                <form method="POST" action="/admin/faculty/import" enctype="multipart/form-data">
+                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer" id="dropZone">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto text-gray-400 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="12" y2="12"/><line x1="15" y1="15" x2="12" y2="12"/></svg>
+                        <p class="text-sm text-gray-600 mb-1">Drop a <strong>.json</strong> file here or click to browse</p>
+                        <p class="text-xs text-gray-400">Maximum file size: 5 MB</p>
+                        <input type="file" name="jsonFile" accept=".json,application/json" class="hidden" id="fileInput">
+                    </div>
+                    <div id="fileName" class="hidden mt-3 text-sm text-green-600 font-medium"></div>
+                    <button type="submit" class="mt-5 w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors shadow-sm">Import Faculty</button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Or Paste JSON Manually
+                </h3>
+                <form method="POST" action="/admin/faculty/import">
+                    <textarea name="jsonData" rows="12" class="w-full text-sm font-mono border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" placeholder='Paste JSON array here...'></textarea>
+                    <button type="submit" class="mt-4 w-full bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors shadow-sm">Import from Text</button>
+                </form>
+            </div>
         </div>
     </main>
 </div>
 
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileName = document.getElementById('fileName');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-blue-500', 'bg-blue-50');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            showFileName(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) showFileName(fileInput.files[0]);
+    });
+
+    function showFileName(file) {
+        if (!file.name.endsWith('.json')) {
+            fileName.textContent = 'Please select a .json file';
+            fileName.className = 'mt-3 text-sm text-red-600 font-medium';
+            fileName.classList.remove('hidden');
+            return;
+        }
+        fileName.textContent = 'Selected: ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+        fileName.className = 'mt-3 text-sm text-green-600 font-medium';
+        fileName.classList.remove('hidden');
+    }
+</script>
 </body>
 </html>
