@@ -821,7 +821,7 @@ async function checkEndpoint(url, timeout = 5000) {
 
 async function checkCloudinary() {
     try {
-        if (!process.env.CLOUDINARY_URL) return { status: 'unconfigured', code: null };
+        if (!process.env.CLOUDINARY_URL && !process.env.CLOUDINARY_CLOUD_NAME) return { status: 'unconfigured', code: null };
         const res = await cloudinarySdk.api.ping();
         return { status: 'connected', code: res?.status || 200 };
     } catch (e) {
