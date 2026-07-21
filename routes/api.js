@@ -144,7 +144,12 @@ router.get('/timetable', async (req, res) => {
 // GET /api/calendar
 router.get('/calendar', async (req, res) => {
     try {
-        const { source = 'proxied', session = "2025-2026", title = "" } = req.query;
+        // Read the saved calendar source from app_config (set in admin panel)
+        let source = 'proxied';
+        try {
+            const cfg = await db.execute({ sql: "SELECT value FROM app_config WHERE key = 'calendar_source'", args: [] });
+            if (cfg.rows.length > 0 && cfg.rows[0].value) source = cfg.rows[0].value;
+        } catch (_) {}
 
         if (source === 'custom') {
             const eventsRes = await db.execute({
@@ -154,6 +159,7 @@ router.get('/calendar', async (req, res) => {
             return res.json({ source: 'custom', events: eventsRes.rows });
         }
 
+        const { session = "2025-2026", title = "" } = req.query;
         const data = await secureFetch(`/student/calendardayslist/${session}?title=${title}`, req.sessionId, res);
         data.source = 'proxied';
         res.json(data);

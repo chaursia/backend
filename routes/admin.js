@@ -1297,14 +1297,19 @@ router.post('/faculty/:id/delete', async (req, res) => {
 // ─────────────────────────────────────────────
 
 router.get('/calendar', async (req, res) => {
-    const view = req.query.view || 'custom';
     const search = req.query.q || '';
 
     try {
+        let calSource = 'custom';
+        try {
+            const cfg = await db.execute({ sql: "SELECT value FROM app_config WHERE key = 'calendar_source'", args: [] });
+            if (cfg.rows.length > 0 && cfg.rows[0].value) calSource = cfg.rows[0].value;
+        } catch (_) {}
+
         let proxiedData = null;
         let proxiedError = null;
 
-        if (view === 'proxied') {
+        if (calSource === 'proxied') {
             try {
                 const proxiedRes = await fetch(`${API_BASE}/student/calendardayslist/2025-2026?title=${encodeURIComponent(search)}`, {
                     headers: { 'Content-Type': 'application/json' }
@@ -1322,7 +1327,7 @@ router.get('/calendar', async (req, res) => {
         let events = [];
         let totalEvents = 0;
 
-        if (view === 'custom') {
+        if (calSource === 'custom') {
             let sql = 'SELECT * FROM calendar_events WHERE 1=1';
             let countSql = 'SELECT COUNT(*) as count FROM calendar_events WHERE 1=1';
             const args = [];
@@ -1346,7 +1351,7 @@ router.get('/calendar', async (req, res) => {
         }
 
         res.render('calendar', {
-            view,
+            calSource,
             search,
             proxiedData,
             proxiedError,
@@ -1358,6 +1363,23 @@ router.get('/calendar', async (req, res) => {
         });
     } catch (err) {
         res.status(500).send('Error loading calendar: ' + err.message);
+    }
+});
+
+router.post('/calendar/source', async (req, res) => {
+    try {
+        const { source } = req.body;
+        if (source !== 'proxied' && source !== 'custom') {
+            return res.status(400).send('Invalid source. Must be "proxied" or "custom".');
+        }
+        await db.execute({
+            sql: "INSERT INTO app_config (key, value, updated_at) VALUES ('calendar_source', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP",
+            args: [source, source]
+        });
+        await logAudit(req.adminUser, 'update_calendar_source', 'system', '1', { source });
+        res.redirect('/admin/calendar');
+    } catch (err) {
+        res.status(500).send('Failed to update calendar source: ' + err.message);
     }
 });
 

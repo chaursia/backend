@@ -2,29 +2,32 @@
 <div class="flex">
     <%- include('partials/sidebar') %>
     <main class="ml-64 flex-1 p-8 min-h-screen bg-gray-50">
-        <div class="flex items-center justify-between mb-8">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900">Calendar</h1>
-                <p class="text-gray-500 text-sm mt-1">
-                    <% if (view === 'custom') { %>
-                        <%= totalEvents %> custom events
-                    <% } else { %>
-                        Proxied from College API
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Calendar</h1>
+                    <p class="text-gray-500 text-sm mt-1">
+                        <% if (calSource === 'custom') { %>
+                            <%= totalEvents %> custom events
+                        <% } else { %>
+                            Proxied from College API
+                        <% } %>
+                    </p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <form method="POST" action="/admin/calendar/source" class="flex items-center gap-2">
+                        <select name="source" class="text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white">
+                            <option value="custom" <%= calSource === 'custom' ? 'selected' : '' %>>Custom Calendar</option>
+                            <option value="proxied" <%= calSource === 'proxied' ? 'selected' : '' %>>Proxied Calendar</option>
+                        </select>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">Apply</button>
+                    </form>
+                    <% if (calSource === 'custom') { %>
+                    <a href="/admin/calendar/import" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
+                        Import JSON
+                    </a>
                     <% } %>
-                </p>
-            </div>
-            <div class="flex gap-3">
-                <a href="/admin/calendar?view=proxied" class="inline-flex items-center gap-2 <%= view === 'proxied' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' %> text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
-                    Proxied Calendar
-                </a>
-                <a href="/admin/calendar?view=custom" class="inline-flex items-center gap-2 <%= view === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' %> text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
-                    Custom Calendar
-                </a>
-                <% if (view === 'custom') { %>
-                <a href="/admin/calendar/import" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
-                    Import JSON
-                </a>
-                <% } %>
+                </div>
             </div>
         </div>
 
@@ -34,17 +37,16 @@
         </div>
         <% } %>
 
-        <% if (view === 'custom') { %>
+        <% if (calSource === 'custom') { %>
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-5">
             <form action="/admin/calendar" method="GET" class="flex gap-3 flex-wrap">
-                <input type="hidden" name="view" value="custom">
                 <div class="flex-1 min-w-[200px] relative">
                     <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     <input type="text" name="q" value="<%= search %>" placeholder="Search events..." class="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
                 </div>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">Search</button>
                 <% if (search) { %>
-                <a href="/admin/calendar?view=custom" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">Clear</a>
+                <a href="/admin/calendar" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">Clear</a>
                 <% } %>
             </form>
         </div>
@@ -105,14 +107,13 @@
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-5">
             <form action="/admin/calendar" method="GET" class="flex gap-3 flex-wrap">
-                <input type="hidden" name="view" value="proxied">
                 <div class="flex-1 min-w-[200px] relative">
                     <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     <input type="text" name="q" value="<%= search %>" placeholder="Search by title..." class="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
                 </div>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">Search</button>
                 <% if (search) { %>
-                <a href="/admin/calendar?view=proxied" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">Clear</a>
+                <a href="/admin/calendar" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">Clear</a>
                 <% } %>
             </form>
         </div>
@@ -168,7 +169,7 @@
             </div>
             <% } else { %>
             <div class="p-8 text-center text-gray-400">
-                Select "Proxied Calendar" tab to load data from College API
+                Select "Proxied Calendar" from the dropdown and click Apply to load data from College API
             </div>
             <% } %>
         </div>
