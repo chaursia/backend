@@ -805,6 +805,7 @@ router.get('/server-logs', (req, res) => {
     res.render('server-logs', { logs: sysLogger.getLogs() });
 });
 
+const cloudinarySdk = require('cloudinary').v2;
 const API_BASE = 'https://itsapi.aperptech.com/api';
 async function checkEndpoint(url, timeout = 5000) {
     try {
@@ -815,6 +816,16 @@ async function checkEndpoint(url, timeout = 5000) {
         return { status: res.ok ? 'reachable' : 'error', code: res.status };
     } catch (e) {
         return { status: e.name === 'AbortError' ? 'timeout' : 'unreachable', code: null };
+    }
+}
+
+async function checkCloudinary() {
+    try {
+        if (!process.env.CLOUDINARY_URL) return { status: 'unconfigured', code: null };
+        const res = await cloudinarySdk.api.ping();
+        return { status: 'connected', code: res?.status || 200 };
+    } catch (e) {
+        return { status: 'error', code: e?.http_code || null };
     }
 }
 
@@ -830,10 +841,9 @@ router.get('/health', async (req, res) => {
         db.execute('SELECT COUNT(*) as count FROM faculty').then(r => r.rows[0].count).catch(() => '?'),
         db.execute('SELECT COUNT(*) as count FROM calendar_events').then(r => r.rows[0].count).catch(() => '?'),
         db.execute('SELECT COUNT(*) as count FROM social_posts').then(r => r.rows[0].count).catch(() => '?'),
-        checkEndpoint(`${API_BASE}/login`),
-        checkEndpoint(`${API_BASE}/profile`),
+        checkEndpoint(API_BASE),
         checkEndpoint(`${API_BASE}/college/information`),
-        checkEndpoint(`https://api.cloudinary.com/v1_1/${(process.env.CLOUDINARY_URL || '').match(/@([^@]+)$/)?.[1] || 'unknown'}/ping`, 3000),
+        checkCloudinary(),
     ]);
 
     const get = (i, def) => results[i]?.status === 'fulfilled' ? results[i].value : def;
@@ -855,9 +865,8 @@ router.get('/health', async (req, res) => {
             memoryUsage: `${Math.round(ms.heapUsed / 1024 / 1024)} MB`,
             checkedAt: new Date().toLocaleString('en-IN'),
             collegeApi: get(7, { status: 'unreachable', code: null }),
-            collegeProfile: get(8, { status: 'unreachable', code: null }),
-            collegeInfo: get(9, { status: 'unreachable', code: null }),
-            cloudinary: get(10, { status: 'unreachable', code: null }),
+            collegeInfo: get(8, { status: 'unreachable', code: null }),
+            cloudinary: get(9, { status: 'unreachable', code: null }),
         }
     });
 });

@@ -16,13 +16,13 @@
             <div class="relative w-full overflow-x-auto">
                 <svg viewBox="0 0 900 220" class="w-full max-w-4xl" xmlns="http://www.w3.org/2000/svg">
                     <!-- connection lines -->
-                    <% const lineColor = (s) => s === 'connected' || s === 'reachable' ? '#22c55e' : '#ef4444'; %>
+                    <% const lineColor = (s) => s === 'connected' || s === 'reachable' ? '#22c55e' : (s === 'unconfigured' ? '#eab308' : '#ef4444'); %>
                     <line x1="150" y1="110" x2="300" y2="40" stroke="<%= lineColor(health.turso) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="300" y2="110" stroke="<%= lineColor(health.supabase) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="300" y2="180" stroke="<%= lineColor(health.smtp) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="550" y2="40" stroke="<%= lineColor(health.cloudinary.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="550" y2="110" stroke="<%= lineColor(health.collegeApi.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
-                    <line x1="150" y1="110" x2="550" y2="180" stroke="<%= lineColor(health.collegeProfile.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="550" y2="180" stroke="<%= lineColor(health.collegeInfo.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
 
                     <!-- Node: Server -->
                     <rect x="20" y="85" width="130" height="50" rx="10" fill="#1e293b"/>
@@ -45,9 +45,10 @@
                     <text x="360" y="194" text-anchor="middle" fill="#64748b" font-size="10"><%= health.smtp.charAt(0).toUpperCase() + health.smtp.slice(1) %></text>
 
                     <!-- Node: Cloudinary -->
-                    <rect x="550" y="15" width="130" height="50" rx="10" fill="<%= health.cloudinary?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.cloudinary?.status) %>" stroke-width="2"/>
-                    <text x="615" y="42" text-anchor="middle" fill="<%= health.cloudinary?.status === 'reachable' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">Cloudinary</text>
-                    <text x="615" y="56" text-anchor="middle" fill="#64748b" font-size="10"><%= health.cloudinary?.status === 'reachable' ? 'Connected' : (health.cloudinary?.status || 'Unknown') %></text>
+                    <% const cldStat = health.cloudinary?.status; const cldOk = cldStat === 'connected'; const cldUncfg = cldStat === 'unconfigured'; %>
+                    <rect x="550" y="15" width="130" height="50" rx="10" fill="<%= cldOk ? '#dcfce7' : (cldUncfg ? '#fef9c3' : '#fee2e2') %>" stroke="<%= lineColor(cldStat) %>" stroke-width="2"/>
+                    <text x="615" y="42" text-anchor="middle" fill="<%= cldOk ? '#16a34a' : (cldUncfg ? '#ca8a04' : '#dc2626') %>" font-size="13" font-weight="bold">Cloudinary</text>
+                    <text x="615" y="56" text-anchor="middle" fill="#64748b" font-size="10"><%= cldOk ? 'Connected' : (cldUncfg ? 'Unconfigured' : 'Error') %></text>
 
                     <!-- Node: College API -->
                     <rect x="550" y="85" width="130" height="50" rx="10" fill="<%= health.collegeApi?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.collegeApi?.status) %>" stroke-width="2"/>
@@ -55,9 +56,9 @@
                     <text x="615" y="126" text-anchor="middle" fill="#64748b" font-size="10"><%= health.collegeApi?.status === 'reachable' ? `HTTP ${health.collegeApi.code}` : (health.collegeApi?.status || 'Unreachable') %></text>
 
                     <!-- Node: Other ERP -->
-                    <rect x="550" y="155" width="130" height="50" rx="10" fill="<%= health.collegeProfile?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.collegeProfile?.status) %>" stroke-width="2"/>
-                    <text x="615" y="180" text-anchor="middle" fill="<%= health.collegeProfile?.status === 'reachable' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">College Info</text>
-                    <text x="615" y="194" text-anchor="middle" fill="#64748b" font-size="10"><%= health.collegeProfile?.status === 'reachable' ? `HTTP ${health.collegeProfile.code}` : (health.collegeProfile?.status || 'Unreachable') %></text>
+                    <rect x="550" y="155" width="130" height="50" rx="10" fill="<%= health.collegeInfo?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.collegeInfo?.status) %>" stroke-width="2"/>
+                    <text x="615" y="180" text-anchor="middle" fill="<%= health.collegeInfo?.status === 'reachable' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">College Info</text>
+                    <text x="615" y="194" text-anchor="middle" fill="#64748b" font-size="10"><%= health.collegeInfo?.status === 'reachable' ? `HTTP ${health.collegeInfo.code}` : (health.collegeInfo?.status || 'Unreachable') %></text>
                 </svg>
             </div>
         </div>
@@ -119,9 +120,8 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 class="font-semibold text-gray-900 mb-5">College ERP Endpoints</h2>
             <div class="space-y-3">
-                <% const erpEndpoints = [
-                    { name: 'Login API', key: 'collegeApi', path: '/login' },
-                    { name: 'Profile API', key: 'collegeProfile', path: '/profile' },
+                    <% const erpEndpoints = [
+                    { name: 'Base API', key: 'collegeApi', path: '/' },
                     { name: 'College Info', key: 'collegeInfo', path: '/college/information' },
                 ] %>
                 <% erpEndpoints.forEach(ep => { %>
@@ -148,17 +148,20 @@
         <!-- Cloudinary Status -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <%
+                    let cldColor = 'red';
+                    let cldLabel = health.cloudinary?.status || 'Unknown';
+                    if (health.cloudinary?.status === 'connected') { cldColor = 'green'; cldLabel = 'Connected'; }
+                    if (health.cloudinary?.status === 'unconfigured') { cldColor = 'amber'; cldLabel = 'Unconfigured'; }
+                %>
                 <div class="flex items-center justify-between mb-4">
-                    <div class="w-10 h-10 rounded-xl <%= (health.cloudinary?.status === 'reachable') ? 'bg-green-100' : 'bg-red-100' %> flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 <%= (health.cloudinary?.status === 'reachable') ? 'text-green-600' : 'text-red-600' %>" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.5 20H7a5 5 0 0 1-4.5-7.5A5 5 0 0 1 7 7h.5A7 7 0 0 1 19 9.5"/><path d="M16 14v6"/><path d="M19 17h-6"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-<%= cldColor %>-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-<%= cldColor %>-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.5 20H7a5 5 0 0 1-4.5-7.5A5 5 0 0 1 7 7h.5A7 7 0 0 1 19 9.5"/><path d="M16 14v6"/><path d="M19 17h-6"/></svg>
                     </div>
-                    <span class="w-2.5 h-2.5 rounded-full <%= (health.cloudinary?.status === 'reachable') ? 'bg-green-500 animate-pulse' : 'bg-red-500' %>"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-<%= cldColor %>-500 <%= health.cloudinary?.status === 'connected' ? 'animate-pulse' : '' %>"></span>
                 </div>
                 <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Cloudinary</div>
-                <div class="text-lg font-bold <%= (health.cloudinary?.status === 'reachable') ? 'text-green-600' : 'text-red-600' %> capitalize"><%= health.cloudinary?.status === 'reachable' ? 'Connected' : (health.cloudinary?.status || 'Unknown') %></div>
-                <% if (health.cloudinary?.code) { %>
-                    <div class="text-[10px] text-gray-400 mt-1">HTTP <%= health.cloudinary.code %></div>
-                <% } %>
+                <div class="text-lg font-bold text-<%= cldColor %>-600 capitalize"><%= cldLabel %></div>
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
