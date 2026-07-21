@@ -67,7 +67,14 @@
                         <tr class="hover:bg-gray-50 transition-colors group">
                             <td class="px-6 py-4 font-mono text-xs text-gray-600"><%= f.employee_id %></td>
                             <td class="px-6 py-4">
-                                <div class="font-semibold text-gray-900"><%= f.name %></div>
+                                <div class="flex items-center gap-3">
+                                    <% if (f.profile_image) { %>
+                                        <img src="<%= f.profile_image %>" alt="" class="w-9 h-9 rounded-full object-cover border border-gray-200 flex-shrink-0">
+                                    <% } else { %>
+                                        <div class="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold flex-shrink-0"><%= f.name.charAt(0) %></div>
+                                    <% } %>
+                                    <div class="font-semibold text-gray-900"><%= f.name %></div>
+                                </div>
                             </td>
                             <td class="px-6 py-4 text-gray-700"><%= f.designation || '-' %></td>
                             <td class="px-6 py-4 text-gray-700"><%= f.department || '-' %></td>

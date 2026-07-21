@@ -53,6 +53,16 @@
                         <label class="text-sm font-semibold text-gray-700 block mb-1.5">Specialization</label>
                         <input type="text" name="specialization" value="<%= faculty ? faculty.specialization : '' %>" placeholder="e.g., Machine Learning" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
                     </div>
+                    <div class="sm:col-span-2">
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Profile Image URL</label>
+                        <input type="url" name="profile_image" value="<%= faculty ? faculty.profile_image : '' %>" placeholder="https://example.com/photo.jpg" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                        <% if (faculty && faculty.profile_image) { %>
+                            <div class="mt-2 flex items-center gap-3">
+                                <img src="<%= faculty.profile_image %>" alt="" class="w-10 h-10 rounded-full object-cover border border-gray-200">
+                                <span class="text-xs text-gray-400 truncate max-w-xs"><%= faculty.profile_image %></span>
+                            </div>
+                        <% } %>
+                    </div>
                     <div class="flex items-center">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" name="is_active" <%= (faculty ? faculty.is_active : true) ? 'checked' : '' %> class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">

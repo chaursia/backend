@@ -1158,12 +1158,12 @@ router.get('/faculty/:id/edit', async (req, res) => {
 });
 
 router.post('/faculty', async (req, res) => {
-    const { employee_id, name, designation, department, email, phone, qualification, specialization, is_active } = req.body;
+    const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = req.body;
     try {
         await db.execute({
-            sql: `INSERT INTO faculty (employee_id, name, designation, department, email, phone, qualification, specialization, is_active)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [employee_id, name, designation, department, email, phone, qualification, specialization, is_active === 'on' ? 1 : 0]
+            sql: `INSERT INTO faculty (employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [employee_id, name, designation, department, email, phone, qualification, specialization, profile_image || null, is_active === 'on' ? 1 : 0]
         });
         await logAudit(req.adminUser, 'create_faculty', 'faculty', employee_id, { name, department });
         res.redirect('/admin/faculty?success=1');
@@ -1173,15 +1173,15 @@ router.post('/faculty', async (req, res) => {
 });
 
 router.post('/faculty/:id', async (req, res) => {
-    const { employee_id, name, designation, department, email, phone, qualification, specialization, is_active } = req.body;
+    const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = req.body;
     try {
         await db.execute({
             sql: `UPDATE faculty SET
                   employee_id = ?, name = ?, designation = ?, department = ?,
                   email = ?, phone = ?, qualification = ?, specialization = ?,
-                  is_active = ?, updated_at = CURRENT_TIMESTAMP
+                  profile_image = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
                   WHERE id = ?`,
-            args: [employee_id, name, designation, department, email, phone, qualification, specialization, is_active === 'on' ? 1 : 0, req.params.id]
+            args: [employee_id, name, designation, department, email, phone, qualification, specialization, profile_image || null, is_active === 'on' ? 1 : 0, req.params.id]
         });
         await logAudit(req.adminUser, 'update_faculty', 'faculty', req.params.id, { name, department });
         res.redirect(`/admin/faculty/${req.params.id}/edit?saved=1`);
@@ -1243,24 +1243,24 @@ router.post('/faculty/import', async (req, res) => {
                         sql: `UPDATE faculty SET
                               name = ?, designation = ?, department = ?, email = ?,
                               phone = ?, qualification = ?, specialization = ?,
-                              is_active = ?, updated_at = CURRENT_TIMESTAMP
+                              profile_image = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
                               WHERE employee_id = ?`,
                         args: [
                             f.name, f.designation || null, f.department || null, f.email || null,
                             f.phone || null, f.qualification || null, f.specialization || null,
-                            f.is_active !== undefined ? (f.is_active ? 1 : 0) : 1,
+                            f.profile_image || null, f.is_active !== undefined ? (f.is_active ? 1 : 0) : 1,
                             f.employee_id
                         ]
                     });
                     updated++;
                 } else {
                     await db.execute({
-                        sql: `INSERT INTO faculty (employee_id, name, designation, department, email, phone, qualification, specialization, is_active)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        sql: `INSERT INTO faculty (employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                         args: [
                             f.employee_id, f.name, f.designation || null, f.department || null,
                             f.email || null, f.phone || null, f.qualification || null,
-                            f.specialization || null, f.is_active !== undefined ? (f.is_active ? 1 : 0) : 1
+                            f.specialization || null, f.profile_image || null, f.is_active !== undefined ? (f.is_active ? 1 : 0) : 1
                         ]
                     });
                     created++;
