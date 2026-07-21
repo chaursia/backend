@@ -1158,8 +1158,10 @@ router.get('/faculty/:id/edit', async (req, res) => {
 });
 
 router.post('/faculty', async (req, res) => {
-    const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = req.body;
     try {
+        const body = req.body || {};
+        const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = body;
+        if (!employee_id || !name) return res.status(400).send('employee_id and name are required');
         await db.execute({
             sql: `INSERT INTO faculty (employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1173,8 +1175,10 @@ router.post('/faculty', async (req, res) => {
 });
 
 router.post('/faculty/:id', async (req, res) => {
-    const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = req.body;
     try {
+        const body = req.body || {};
+        const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = body;
+        if (!employee_id || !name) return res.status(400).send('employee_id and name are required');
         await db.execute({
             sql: `UPDATE faculty SET
                   employee_id = ?, name = ?, designation = ?, department = ?,
@@ -1208,11 +1212,12 @@ const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSiz
 
 router.post('/faculty/import', importUpload.single('jsonFile'), async (req, res) => {
     try {
+        const body = req.body || {};
         let rawJson;
         if (req.file) {
             rawJson = req.file.buffer.toString('utf-8');
-        } else if (req.body.jsonData && req.body.jsonData.trim()) {
-            rawJson = req.body.jsonData;
+        } else if (body.jsonData && body.jsonData.trim()) {
+            rawJson = body.jsonData;
         } else {
             return res.status(400).send('Please upload a JSON file or paste JSON data.');
         }
