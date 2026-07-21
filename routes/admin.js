@@ -805,29 +805,59 @@ router.get('/server-logs', (req, res) => {
     res.render('server-logs', { logs: sysLogger.getLogs() });
 });
 
+const API_BASE = 'https://itsapi.aperptech.com/api';
+async function checkEndpoint(url, timeout = 5000) {
+    try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(id);
+        return { status: res.ok ? 'reachable' : 'error', code: res.status };
+    } catch (e) {
+        return { status: e.name === 'AbortError' ? 'timeout' : 'unreachable', code: null };
+    }
+}
+
 router.get('/health', async (req, res) => {
     const ms = process.memoryUsage();
     const uptimeSec = process.uptime();
-    const [tursoStatus, supabaseStatus, smtpRes, usersCount] = await Promise.all([
+
+    const results = await Promise.allSettled([
         db.execute('SELECT 1').then(() => 'connected').catch(() => 'error'),
         supabase.from('app_settings').select('id').limit(1).then(r => r.error ? 'error' : 'connected').catch(() => 'error'),
         checkSmtpConnection(),
         db.execute('SELECT COUNT(*) as count FROM users').then(r => r.rows[0].count).catch(() => '?'),
+        db.execute('SELECT COUNT(*) as count FROM faculty').then(r => r.rows[0].count).catch(() => '?'),
+        db.execute('SELECT COUNT(*) as count FROM calendar_events').then(r => r.rows[0].count).catch(() => '?'),
+        db.execute('SELECT COUNT(*) as count FROM social_posts').then(r => r.rows[0].count).catch(() => '?'),
+        checkEndpoint(`${API_BASE}/login`),
+        checkEndpoint(`${API_BASE}/profile`),
+        checkEndpoint(`${API_BASE}/college/information`),
+        checkEndpoint(`https://api.cloudinary.com/v1_1/${(process.env.CLOUDINARY_URL || '').match(/@([^@]+)$/)?.[1] || 'unknown'}/ping`, 3000),
     ]);
+
+    const get = (i, def) => results[i]?.status === 'fulfilled' ? results[i].value : def;
 
     res.render('health', {
         health: {
-            turso: tursoStatus,
-            supabase: supabaseStatus,
-            smtp: smtpRes.status,
-            smtpMessage: smtpRes.message,
+            turso: get(0, 'error'),
+            supabase: get(1, 'error'),
+            smtp: get(2, { status: 'unconfigured', message: '' }).status,
+            smtpMessage: get(2, { status: 'unconfigured', message: '' }).message,
             uptime: `${Math.floor(uptimeSec / 3600)}h ${Math.floor((uptimeSec % 3600) / 60)}m`,
             nodeVersion: process.version,
             env: process.env.NODE_ENV || 'development',
             platform: process.platform,
-            totalUsers: usersCount,
+            totalUsers: get(3, '?'),
+            totalFaculty: get(4, '?'),
+            totalCalendarEvents: get(5, '?'),
+            totalSocialPosts: get(6, '?'),
             memoryUsage: `${Math.round(ms.heapUsed / 1024 / 1024)} MB`,
             checkedAt: new Date().toLocaleString('en-IN'),
+            collegeApi: get(7, { status: 'unreachable', code: null }),
+            collegeProfile: get(8, { status: 'unreachable', code: null }),
+            collegeInfo: get(9, { status: 'unreachable', code: null }),
+            cloudinary: get(10, { status: 'unreachable', code: null }),
         }
     });
 });
@@ -1231,8 +1261,6 @@ router.post('/faculty/import', async (req, res) => {
 // ─────────────────────────────────────────────
 //  CALENDAR MANAGEMENT
 // ─────────────────────────────────────────────
-
-const API_BASE = 'https://itsapi.aperptech.com/api';
 
 router.get('/calendar', async (req, res) => {
     const view = req.query.view || 'custom';

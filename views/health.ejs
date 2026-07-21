@@ -1,4 +1,7 @@
 <%- include('partials/head') %>
+<style>
+    .net-line { transition: stroke 0.5s ease; }
+</style>
 <div class="flex">
     <%- include('partials/sidebar') %>
     <main class="ml-64 flex-1 p-8 min-h-screen bg-gray-50">
@@ -7,8 +10,60 @@
             <p class="text-gray-500 text-sm mt-1">Live status of all connected services</p>
         </div>
 
+        <!-- Network Architecture Diagram -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+            <h2 class="font-semibold text-gray-900 mb-4">Network Architecture</h2>
+            <div class="relative w-full overflow-x-auto">
+                <svg viewBox="0 0 900 220" class="w-full max-w-4xl" xmlns="http://www.w3.org/2000/svg">
+                    <!-- connection lines -->
+                    <% const lineColor = (s) => s === 'connected' || s === 'reachable' ? '#22c55e' : '#ef4444'; %>
+                    <line x1="150" y1="110" x2="300" y2="40" stroke="<%= lineColor(health.turso) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="300" y2="110" stroke="<%= lineColor(health.supabase) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="300" y2="180" stroke="<%= lineColor(health.smtp) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="550" y2="40" stroke="<%= lineColor(health.cloudinary.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="550" y2="110" stroke="<%= lineColor(health.collegeApi.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="550" y2="180" stroke="<%= lineColor(health.collegeProfile.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+
+                    <!-- Node: Server -->
+                    <rect x="20" y="85" width="130" height="50" rx="10" fill="#1e293b"/>
+                    <text x="85" y="112" text-anchor="middle" fill="white" font-size="13" font-weight="bold">ITS Backend Server</text>
+                    <text x="85" y="126" text-anchor="middle" fill="#94a3b8" font-size="10"><%= health.uptime %></text>
+
+                    <!-- Node: Turso -->
+                    <rect x="300" y="15" width="120" height="50" rx="10" fill="<%= health.turso === 'connected' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.turso) %>" stroke-width="2"/>
+                    <text x="360" y="42" text-anchor="middle" fill="<%= health.turso === 'connected' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">Turso DB</text>
+                    <text x="360" y="56" text-anchor="middle" fill="#64748b" font-size="10"><%= health.turso === 'connected' ? 'Connected' : 'Error' %></text>
+
+                    <!-- Node: Supabase -->
+                    <rect x="300" y="85" width="120" height="50" rx="10" fill="<%= health.supabase === 'connected' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.supabase) %>" stroke-width="2"/>
+                    <text x="360" y="112" text-anchor="middle" fill="<%= health.supabase === 'connected' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">Supabase</text>
+                    <text x="360" y="126" text-anchor="middle" fill="#64748b" font-size="10"><%= health.supabase === 'connected' ? 'Connected' : 'Error' %></text>
+
+                    <!-- Node: SMTP -->
+                    <rect x="300" y="155" width="120" height="50" rx="10" fill="<%= health.smtp === 'connected' ? '#dcfce7' : (health.smtp === 'unconfigured' ? '#fef9c3' : '#fee2e2') %>" stroke="<%= health.smtp === 'connected' ? '#22c55e' : (health.smtp === 'unconfigured' ? '#eab308' : '#ef4444') %>" stroke-width="2"/>
+                    <text x="360" y="180" text-anchor="middle" fill="<%= health.smtp === 'connected' ? '#16a34a' : (health.smtp === 'unconfigured' ? '#ca8a04' : '#dc2626') %>" font-size="13" font-weight="bold">Gmail SMTP</text>
+                    <text x="360" y="194" text-anchor="middle" fill="#64748b" font-size="10"><%= health.smtp.charAt(0).toUpperCase() + health.smtp.slice(1) %></text>
+
+                    <!-- Node: Cloudinary -->
+                    <rect x="550" y="15" width="130" height="50" rx="10" fill="<%= health.cloudinary?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.cloudinary?.status) %>" stroke-width="2"/>
+                    <text x="615" y="42" text-anchor="middle" fill="<%= health.cloudinary?.status === 'reachable' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">Cloudinary</text>
+                    <text x="615" y="56" text-anchor="middle" fill="#64748b" font-size="10"><%= health.cloudinary?.status === 'reachable' ? 'Connected' : (health.cloudinary?.status || 'Unknown') %></text>
+
+                    <!-- Node: College API -->
+                    <rect x="550" y="85" width="130" height="50" rx="10" fill="<%= health.collegeApi?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.collegeApi?.status) %>" stroke-width="2"/>
+                    <text x="615" y="112" text-anchor="middle" fill="<%= health.collegeApi?.status === 'reachable' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">College ERP API</text>
+                    <text x="615" y="126" text-anchor="middle" fill="#64748b" font-size="10"><%= health.collegeApi?.status === 'reachable' ? `HTTP ${health.collegeApi.code}` : (health.collegeApi?.status || 'Unreachable') %></text>
+
+                    <!-- Node: Other ERP -->
+                    <rect x="550" y="155" width="130" height="50" rx="10" fill="<%= health.collegeProfile?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.collegeProfile?.status) %>" stroke-width="2"/>
+                    <text x="615" y="180" text-anchor="middle" fill="<%= health.collegeProfile?.status === 'reachable' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">College Info</text>
+                    <text x="615" y="194" text-anchor="middle" fill="#64748b" font-size="10"><%= health.collegeProfile?.status === 'reachable' ? `HTTP ${health.collegeProfile.code}` : (health.collegeProfile?.status || 'Unreachable') %></text>
+                </svg>
+            </div>
+        </div>
+
         <!-- Status Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div class="flex items-center justify-between mb-4">
                     <div class="w-10 h-10 rounded-xl bg-<%= health.turso === 'connected' ? 'green' : 'red' %>-100 flex items-center justify-center">
@@ -60,6 +115,73 @@
             </div>
         </div>
 
+        <!-- College ERP Endpoints -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+            <h2 class="font-semibold text-gray-900 mb-5">College ERP Endpoints</h2>
+            <div class="space-y-3">
+                <% const erpEndpoints = [
+                    { name: 'Login API', key: 'collegeApi', path: '/login' },
+                    { name: 'Profile API', key: 'collegeProfile', path: '/profile' },
+                    { name: 'College Info', key: 'collegeInfo', path: '/college/information' },
+                ] %>
+                <% erpEndpoints.forEach(ep => { %>
+                    <% const st = health[ep.key] || { status: 'unknown', code: null }; %>
+                    <div class="flex items-center justify-between py-3 px-4 rounded-xl <%= st.status === 'reachable' ? 'bg-green-50' : 'bg-red-50' %>">
+                        <div class="flex items-center gap-3">
+                            <span class="w-2.5 h-2.5 rounded-full <%= st.status === 'reachable' ? 'bg-green-500' : 'bg-red-500' %>"></span>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900"><%= ep.name %></div>
+                                <div class="text-xs text-gray-500 font-mono"><%= ep.path %></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <% if (st.code) { %>
+                                <span class="text-xs font-mono <%= st.code >= 200 && st.code < 400 ? 'text-green-600' : 'text-red-600' %>">HTTP <%= st.code %></span>
+                            <% } %>
+                            <span class="text-sm font-medium <%= st.status === 'reachable' ? 'text-green-600' : 'text-red-600' %> capitalize"><%= st.status %></span>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+        </div>
+
+        <!-- Cloudinary Status -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-xl <%= (health.cloudinary?.status === 'reachable') ? 'bg-green-100' : 'bg-red-100' %> flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 <%= (health.cloudinary?.status === 'reachable') ? 'text-green-600' : 'text-red-600' %>" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.5 20H7a5 5 0 0 1-4.5-7.5A5 5 0 0 1 7 7h.5A7 7 0 0 1 19 9.5"/><path d="M16 14v6"/><path d="M19 17h-6"/></svg>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full <%= (health.cloudinary?.status === 'reachable') ? 'bg-green-500 animate-pulse' : 'bg-red-500' %>"></span>
+                </div>
+                <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Cloudinary</div>
+                <div class="text-lg font-bold <%= (health.cloudinary?.status === 'reachable') ? 'text-green-600' : 'text-red-600' %> capitalize"><%= health.cloudinary?.status === 'reachable' ? 'Connected' : (health.cloudinary?.status || 'Unknown') %></div>
+                <% if (health.cloudinary?.code) { %>
+                    <div class="text-[10px] text-gray-400 mt-1">HTTP <%= health.cloudinary.code %></div>
+                <% } %>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                </div>
+                <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Faculty Records</div>
+                <div class="text-lg font-bold text-blue-600"><%= health.totalFaculty %></div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
+                    </div>
+                </div>
+                <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Calendar Events</div>
+                <div class="text-lg font-bold text-purple-600"><%= health.totalCalendarEvents %></div>
+            </div>
+        </div>
+
         <!-- Environment Info -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <h2 class="font-semibold text-gray-900 mb-5">Environment</h2>
@@ -77,12 +199,12 @@
                     <span class="text-sm font-mono font-medium text-gray-800"><%= health.totalUsers %></span>
                 </div>
                 <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                    <span class="text-sm text-gray-500">Social Posts</span>
+                    <span class="text-sm font-mono font-medium text-gray-800"><%= health.totalSocialPosts %></span>
+                </div>
+                <div class="flex justify-between items-center py-3 border-b border-gray-50">
                     <span class="text-sm text-gray-500">Memory Usage</span>
                     <span class="text-sm font-mono font-medium text-gray-800"><%= health.memoryUsage %></span>
-                </div>
-                <div class="flex justify-between items-center py-3">
-                    <span class="text-sm text-gray-500">Platform</span>
-                    <span class="text-sm font-mono font-medium text-gray-800"><%= health.platform %></span>
                 </div>
                 <div class="flex justify-between items-center py-3">
                     <span class="text-sm text-gray-500">Checked At</span>
