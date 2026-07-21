@@ -805,6 +805,20 @@ router.get('/server-logs', (req, res) => {
     res.render('server-logs', { logs: sysLogger.getLogs() });
 });
 
+router.get('/server-logs/data', (req, res) => {
+    const logs = sysLogger.getLogs().map(l => ({
+        timestamp: l.timestamp.toISOString(),
+        type: l.type,
+        message: l.message,
+    }));
+    res.json({ logs });
+});
+
+router.post('/server-logs/clear', (req, res) => {
+    sysLogger.clearLogs();
+    res.json({ success: true });
+});
+
 const cloudinarySdk = require('cloudinary').v2;
 const API_BASE = 'https://itsapi.aperptech.com/api';
 async function checkEndpoint(url, timeout = 5000) {
