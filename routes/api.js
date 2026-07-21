@@ -144,8 +144,18 @@ router.get('/timetable', async (req, res) => {
 // GET /api/calendar
 router.get('/calendar', async (req, res) => {
     try {
-        const { session = "2025-2026", title = "" } = req.query;
+        const { source = 'proxied', session = "2025-2026", title = "" } = req.query;
+
+        if (source === 'custom') {
+            const eventsRes = await db.execute({
+                sql: 'SELECT * FROM calendar_events ORDER BY date ASC, id ASC',
+                args: []
+            });
+            return res.json({ source: 'custom', events: eventsRes.rows });
+        }
+
         const data = await secureFetch(`/student/calendardayslist/${session}?title=${title}`, req.sessionId, res);
+        data.source = 'proxied';
         res.json(data);
     } catch (error) { handleError(res, error); }
 });

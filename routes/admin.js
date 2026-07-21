@@ -1228,4 +1228,150 @@ router.post('/faculty/import', async (req, res) => {
     }
 });
 
+// ─────────────────────────────────────────────
+//  CALENDAR MANAGEMENT
+// ─────────────────────────────────────────────
+
+const API_BASE = 'https://itsapi.aperptech.com/api';
+
+router.get('/calendar', async (req, res) => {
+    const view = req.query.view || 'custom';
+    const search = req.query.q || '';
+
+    try {
+        let proxiedData = null;
+        let proxiedError = null;
+
+        if (view === 'proxied') {
+            try {
+                const proxiedRes = await fetch(`${API_BASE}/student/calendardayslist/2025-2026?title=${encodeURIComponent(search)}`, {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (proxiedRes.ok) {
+                    proxiedData = await proxiedRes.json();
+                } else {
+                    proxiedError = `College API returned status ${proxiedRes.status}`;
+                }
+            } catch (e) {
+                proxiedError = e.message;
+            }
+        }
+
+        let events = [];
+        let totalEvents = 0;
+
+        if (view === 'custom') {
+            let sql = 'SELECT * FROM calendar_events WHERE 1=1';
+            let countSql = 'SELECT COUNT(*) as count FROM calendar_events WHERE 1=1';
+            const args = [];
+
+            if (search) {
+                const pattern = `%${search}%`;
+                sql += ' AND (title LIKE ? OR description LIKE ?)';
+                countSql += ' AND (title LIKE ? OR description LIKE ?)';
+                args.push(pattern, pattern);
+            }
+
+            sql += ' ORDER BY date ASC, id ASC';
+
+            const [eventsRes, countRes] = await Promise.all([
+                db.execute({ sql, args }),
+                db.execute({ sql: countSql, args })
+            ]);
+
+            events = eventsRes.rows;
+            totalEvents = countRes.rows[0].count;
+        }
+
+        res.render('calendar', {
+            view,
+            search,
+            proxiedData,
+            proxiedError,
+            events,
+            totalEvents,
+            flash: req.query.success ? { type: 'success', message: 'Calendar imported successfully' } :
+                   req.query.deleted ? { type: 'success', message: 'Calendar event deleted' } :
+                   req.query.cleared ? { type: 'success', message: 'All custom events cleared' } : null
+        });
+    } catch (err) {
+        res.status(500).send('Error loading calendar: ' + err.message);
+    }
+});
+
+router.get('/calendar/import', (req, res) => {
+    res.render('calendar-import', {
+        flash: req.query.success ? { type: 'success', message: 'Calendar imported successfully' } : null
+    });
+});
+
+router.post('/calendar/import', async (req, res) => {
+    try {
+        const { jsonData } = req.body;
+        if (!jsonData || !jsonData.trim()) {
+            return res.status(400).send('JSON data is required');
+        }
+
+        let eventsArray;
+        try {
+            eventsArray = JSON.parse(jsonData);
+        } catch (e) {
+            return res.status(400).send('Invalid JSON format');
+        }
+
+        if (!Array.isArray(eventsArray)) {
+            return res.status(400).send('JSON must be an array of event objects');
+        }
+
+        let imported = 0;
+        let errors = [];
+
+        for (const ev of eventsArray) {
+            try {
+                if (!ev.title || !ev.date) {
+                    errors.push(`Missing title or date for: ${JSON.stringify(ev).substring(0, 50)}`);
+                    continue;
+                }
+
+                await db.execute({
+                    sql: `INSERT INTO calendar_events (title, date, description, type) VALUES (?, ?, ?, ?)`,
+                    args: [ev.title, ev.date, ev.description || null, ev.type || 'general']
+                });
+                imported++;
+            } catch (e) {
+                errors.push(`${ev.title}: ${e.message}`);
+            }
+        }
+
+        await logAudit(req.adminUser, 'import_calendar', 'calendar', 'bulk', { imported, errors: errors.length });
+
+        const flash = { type: 'success', message: `Import complete: ${imported} events imported` };
+        if (errors.length) flash.message += `, ${errors.length} errors`;
+
+        res.render('calendar-import', { flash });
+    } catch (err) {
+        res.status(500).send('Import failed: ' + err.message);
+    }
+});
+
+router.post('/calendar/events/:id/delete', async (req, res) => {
+    try {
+        await db.execute({ sql: 'DELETE FROM calendar_events WHERE id = ?', args: [req.params.id] });
+        await logAudit(req.adminUser, 'delete_calendar_event', 'calendar', req.params.id);
+        res.redirect('/admin/calendar?deleted=1');
+    } catch (err) {
+        res.status(500).send('Delete failed: ' + err.message);
+    }
+});
+
+router.post('/calendar/clear', async (req, res) => {
+    try {
+        await db.execute('DELETE FROM calendar_events');
+        await logAudit(req.adminUser, 'clear_calendar', 'calendar', 'all');
+        res.redirect('/admin/calendar?cleared=1');
+    } catch (err) {
+        res.status(500).send('Clear failed: ' + err.message);
+    }
+});
+
 module.exports = router;

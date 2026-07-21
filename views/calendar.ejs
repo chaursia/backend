@@ -1,0 +1,180 @@
+<%- include('partials/head') %>
+<div class="flex">
+    <%- include('partials/sidebar') %>
+    <main class="ml-64 flex-1 p-8 min-h-screen bg-gray-50">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Calendar</h1>
+                <p class="text-gray-500 text-sm mt-1">
+                    <% if (view === 'custom') { %>
+                        <%= totalEvents %> custom events
+                    <% } else { %>
+                        Proxied from College API
+                    <% } %>
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/admin/calendar?view=proxied" class="inline-flex items-center gap-2 <%= view === 'proxied' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' %> text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
+                    Proxied Calendar
+                </a>
+                <a href="/admin/calendar?view=custom" class="inline-flex items-center gap-2 <%= view === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' %> text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
+                    Custom Calendar
+                </a>
+                <% if (view === 'custom') { %>
+                <a href="/admin/calendar/import" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
+                    Import JSON
+                </a>
+                <% } %>
+            </div>
+        </div>
+
+        <% if (flash) { %>
+        <div class="mb-4 px-4 py-3 rounded-xl text-sm font-medium <%= flash.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+            <%= flash.message %>
+        </div>
+        <% } %>
+
+        <% if (view === 'custom') { %>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-5">
+            <form action="/admin/calendar" method="GET" class="flex gap-3 flex-wrap">
+                <input type="hidden" name="view" value="custom">
+                <div class="flex-1 min-w-[200px] relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" name="q" value="<%= search %>" placeholder="Search events..." class="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">Search</button>
+                <% if (search) { %>
+                <a href="/admin/calendar?view=custom" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">Clear</a>
+                <% } %>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <span class="text-sm font-semibold text-gray-700">Custom Calendar Events</span>
+                <% if (events.length > 0) { %>
+                <form method="POST" action="/admin/calendar/clear" onsubmit="return confirm('Clear all custom events? This cannot be undone.')">
+                    <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">Clear All</button>
+                </form>
+                <% } %>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50 border-b border-gray-100">
+                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</th>
+                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        <% if (events.length === 0) { %>
+                        <tr>
+                            <td colspan="5" class="text-center py-16 text-gray-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto mb-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                No events found. <a href="/admin/calendar/import" class="text-blue-600 hover:underline">Import calendar data</a>
+                            </td>
+                        </tr>
+                        <% } %>
+                        <% events.forEach(function(ev) { %>
+                        <tr class="hover:bg-gray-50 transition-colors group">
+                            <td class="px-6 py-4 text-sm text-gray-700"><%= ev.date %></td>
+                            <td class="px-6 py-4 font-semibold text-gray-900"><%= ev.title %></td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full 
+                                    <%= ev.type === 'holiday' ? 'text-red-700 bg-red-100' : ev.type === 'exam' ? 'text-orange-700 bg-orange-100' : 'text-blue-700 bg-blue-100' %>">
+                                    <%= ev.type %>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-600 max-w-xs truncate"><%= ev.description || '-' %></td>
+                            <td class="px-6 py-4 text-right">
+                                <form method="POST" action="/admin/calendar/events/<%= ev.id %>/delete" onsubmit="return confirm('Delete this event?')" style="display:inline">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <% } else { %>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-5">
+            <form action="/admin/calendar" method="GET" class="flex gap-3 flex-wrap">
+                <input type="hidden" name="view" value="proxied">
+                <div class="flex-1 min-w-[200px] relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" name="q" value="<%= search %>" placeholder="Search by title..." class="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">Search</button>
+                <% if (search) { %>
+                <a href="/admin/calendar?view=proxied" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">Clear</a>
+                <% } %>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <span class="text-sm font-semibold text-gray-700">Proxied Calendar (College API)</span>
+            </div>
+            <% if (proxiedError) { %>
+            <div class="p-8 text-center">
+                <div class="bg-red-50 text-red-700 rounded-xl p-4 inline-block">
+                    <p class="font-medium">Failed to fetch proxied calendar</p>
+                    <p class="text-sm mt-1"><%= proxiedError %></p>
+                    <p class="text-xs mt-2 text-red-500">Proxied calendar requires active student session authentication.</p>
+                </div>
+            </div>
+            <% } else if (proxiedData) { %>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50 border-b border-gray-100">
+                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</th>
+                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        <% if (proxiedData.data && proxiedData.data.length > 0) { %>
+                            <% proxiedData.data.forEach(function(item) { %>
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 text-sm text-gray-700"><%= item.date || '-' %></td>
+                                <td class="px-6 py-4 font-semibold text-gray-900"><%= item.title || '-' %></td>
+                                <td class="px-6 py-4 text-gray-600"><%= item.description || '-' %></td>
+                            </tr>
+                            <% }); %>
+                        <% } else if (proxiedData.length > 0) { %>
+                            <% proxiedData.forEach(function(item) { %>
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 text-sm text-gray-700"><%= item.date || '-' %></td>
+                                <td class="px-6 py-4 font-semibold text-gray-900"><%= item.title || item.name || '-' %></td>
+                                <td class="px-6 py-4 text-gray-600"><%= item.description || '-' %></td>
+                            </tr>
+                            <% }); %>
+                        <% } else { %>
+                        <tr>
+                            <td colspan="3" class="text-center py-16 text-gray-400">
+                                No calendar data from College API
+                            </td>
+                        </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+            <% } else { %>
+            <div class="p-8 text-center text-gray-400">
+                Select "Proxied Calendar" tab to load data from College API
+            </div>
+            <% } %>
+        </div>
+        <% } %>
+    </main>
+</div>
+
+</body>
+</html>
