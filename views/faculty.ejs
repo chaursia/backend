@@ -10,30 +10,17 @@
         </div>
     </div>
 
-    <% if (locals.flash) { %>
+    <% if (flash) { %>
         <div class="flash flash-<%= flash.type %>"><%= flash.message %></div>
-    <% } else if (req.query.success) { %>
-        <div class="flash flash-success">Faculty created successfully</div>
-    <% } else if (req.query.saved) { %>
-        <div class="flash flash-success">Faculty updated successfully</div>
-    <% } else if (req.query.deleted) { %>
-        <div class="flash flash-success">Faculty deleted successfully</div>
     <% } %>
 
     <div class="card">
         <div class="card-header">
             <form method="GET" class="search-form" style="display: flex; gap: 12px; align-items: center;">
                 <input type="text" name="q" placeholder="Search name, ID, designation, department..." value="<%= search %>" class="form-input" style="max-width: 300px;">
-                
-                <select name="department" class="form-input" style="max-width: 200px;">
-                    <option value="">All Departments</option>
-                    <% departments.forEach(d => { %>
-                        <option value="<%= d %>" <%= department === d ? 'selected' : '' %>><%= d %></option>
-                    <% }) %>
-                </select>
 
                 <button type="submit" class="btn btn-secondary">Filter</button>
-                <% if (search || department) { %>
+                <% if (search) { %>
                     <a href="/admin/faculty" class="btn btn-outline">Clear</a>
                 <% } %>
             </form>
@@ -83,11 +70,11 @@
         <% if (totalPages > 1) { %>
             <div class="pagination">
                 <% if (page > 1) { %>
-                    <a href="/admin/faculty?page=<%= page - 1 %>&q=<%= encodeURIComponent(search) %>&department=<%= encodeURIComponent(department) %>" class="btn btn-outline">Previous</a>
+                    <a href="/admin/faculty?page=<%= page - 1 %>&q=<%= encodeURIComponent(search) %>" class="btn btn-outline">Previous</a>
                 <% } %>
                 <span class="pagination-info">Page <%= page %> of <%= totalPages %> (<%= totalFaculty %> total)</span>
                 <% if (page < totalPages) { %>
-                    <a href="/admin/faculty?page=<%= page + 1 %>&q=<%= encodeURIComponent(search) %>&department=<%= encodeURIComponent(department) %>" class="btn btn-outline">Next</a>
+                    <a href="/admin/faculty?page=<%= page + 1 %>&q=<%= encodeURIComponent(search) %>" class="btn btn-outline">Next</a>
                 <% } %>
             </div>
         <% } %>

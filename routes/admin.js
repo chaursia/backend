@@ -1047,7 +1047,6 @@ router.get('/faculty', async (req, res) => {
     const limit = 20;
     const offset = (page - 1) * limit;
     const search = req.query.q || '';
-    const department = req.query.department || '';
 
     try {
         let sql = 'SELECT * FROM faculty WHERE 1=1';
@@ -1061,19 +1060,12 @@ router.get('/faculty', async (req, res) => {
             args.push(pattern, pattern, pattern, pattern);
         }
 
-        if (department) {
-            sql += ' AND department = ?';
-            countSql += ' AND department = ?';
-            args.push(department);
-        }
-
         sql += ' ORDER BY name ASC LIMIT ? OFFSET ?';
         const queryArgs = [...args, limit, offset];
 
-        const [facultyRes, countRes, deptsRes] = await Promise.all([
+        const [facultyRes, countRes] = await Promise.all([
             db.execute({ sql, args: queryArgs }),
-            db.execute({ sql: countSql, args }),
-            db.execute('SELECT DISTINCT department FROM faculty WHERE department IS NOT NULL ORDER BY department ASC')
+            db.execute({ sql: countSql, args })
         ]);
 
         const totalFaculty = countRes.rows[0].count;
@@ -1085,8 +1077,9 @@ router.get('/faculty', async (req, res) => {
             totalPages,
             totalFaculty,
             search,
-            department,
-            departments: deptsRes.rows.map(r => r.department)
+            flash: req.query.success ? { type: 'success', message: 'Faculty created successfully' } :
+                   req.query.saved ? { type: 'success', message: 'Faculty updated successfully' } :
+                   req.query.deleted ? { type: 'success', message: 'Faculty deleted successfully' } : null
         });
     } catch (err) {
         res.status(500).send('Error loading faculty: ' + err.message);
@@ -1099,16 +1092,13 @@ router.get('/faculty/new', (req, res) => {
 
 router.get('/faculty/:id/edit', async (req, res) => {
     try {
-        const [facultyRes, deptsRes] = await Promise.all([
-            db.execute({ sql: 'SELECT * FROM faculty WHERE id = ?', args: [req.params.id] }),
-            db.execute('SELECT DISTINCT department FROM faculty WHERE department IS NOT NULL ORDER BY department ASC')
-        ]);
+        const facultyRes = await db.execute({ sql: 'SELECT * FROM faculty WHERE id = ?', args: [req.params.id] });
 
         if (facultyRes.rows.length === 0) return res.status(404).send('Faculty not found');
 
         res.render('faculty-form', {
             faculty: facultyRes.rows[0],
-            departments: deptsRes.rows.map(r => r.department)
+            departments: []
         });
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
