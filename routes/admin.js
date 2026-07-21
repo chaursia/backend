@@ -1174,41 +1174,11 @@ router.post('/faculty', async (req, res) => {
     }
 });
 
-router.post('/faculty/:id', async (req, res) => {
-    try {
-        const body = req.body || {};
-        const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = body;
-        if (!employee_id || !name) return res.status(400).send('employee_id and name are required');
-        await db.execute({
-            sql: `UPDATE faculty SET
-                  employee_id = ?, name = ?, designation = ?, department = ?,
-                  email = ?, phone = ?, qualification = ?, specialization = ?,
-                  profile_image = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
-                  WHERE id = ?`,
-            args: [employee_id, name, designation, department, email, phone, qualification, specialization, profile_image || null, is_active === 'on' ? 1 : 0, req.params.id]
-        });
-        await logAudit(req.adminUser, 'update_faculty', 'faculty', req.params.id, { name, department });
-        res.redirect(`/admin/faculty/${req.params.id}/edit?saved=1`);
-    } catch (err) {
-        res.status(500).send('Update failed: ' + err.message);
-    }
-});
-
-router.post('/faculty/:id/delete', async (req, res) => {
-    try {
-        await db.execute({ sql: 'DELETE FROM faculty WHERE id = ?', args: [req.params.id] });
-        await logAudit(req.adminUser, 'delete_faculty', 'faculty', req.params.id);
-        res.redirect('/admin/faculty?deleted=1');
-    } catch (err) {
-        res.status(500).send('Delete failed: ' + err.message);
-    }
-});
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.get('/faculty/import', (req, res) => {
     res.render('faculty-import', { flash: req.query.success ? { type: 'success', message: 'Faculty imported successfully' } : null });
 });
-
-const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.post('/faculty/import', importUpload.single('jsonFile'), async (req, res) => {
     try {
@@ -1289,6 +1259,36 @@ router.post('/faculty/import', importUpload.single('jsonFile'), async (req, res)
         res.render('faculty-import', { flash });
     } catch (err) {
         res.status(500).send('Import failed: ' + err.message);
+    }
+});
+
+router.post('/faculty/:id', async (req, res) => {
+    try {
+        const body = req.body || {};
+        const { employee_id, name, designation, department, email, phone, qualification, specialization, profile_image, is_active } = body;
+        if (!employee_id || !name) return res.status(400).send('employee_id and name are required');
+        await db.execute({
+            sql: `UPDATE faculty SET
+                  employee_id = ?, name = ?, designation = ?, department = ?,
+                  email = ?, phone = ?, qualification = ?, specialization = ?,
+                  profile_image = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                  WHERE id = ?`,
+            args: [employee_id, name, designation, department, email, phone, qualification, specialization, profile_image || null, is_active === 'on' ? 1 : 0, req.params.id]
+        });
+        await logAudit(req.adminUser, 'update_faculty', 'faculty', req.params.id, { name, department });
+        res.redirect(`/admin/faculty/${req.params.id}/edit?saved=1`);
+    } catch (err) {
+        res.status(500).send('Update failed: ' + err.message);
+    }
+});
+
+router.post('/faculty/:id/delete', async (req, res) => {
+    try {
+        await db.execute({ sql: 'DELETE FROM faculty WHERE id = ?', args: [req.params.id] });
+        await logAudit(req.adminUser, 'delete_faculty', 'faculty', req.params.id);
+        res.redirect('/admin/faculty?deleted=1');
+    } catch (err) {
+        res.status(500).send('Delete failed: ' + err.message);
     }
 });
 
