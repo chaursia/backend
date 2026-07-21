@@ -1204,16 +1204,22 @@ router.get('/faculty/import', (req, res) => {
     res.render('faculty-import', { flash: req.query.success ? { type: 'success', message: 'Faculty imported successfully' } : null });
 });
 
-router.post('/faculty/import', async (req, res) => {
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+router.post('/faculty/import', importUpload.single('jsonFile'), async (req, res) => {
     try {
-        const { jsonData } = req.body;
-        if (!jsonData || !jsonData.trim()) {
-            return res.status(400).send('JSON data is required');
+        let rawJson;
+        if (req.file) {
+            rawJson = req.file.buffer.toString('utf-8');
+        } else if (req.body.jsonData && req.body.jsonData.trim()) {
+            rawJson = req.body.jsonData;
+        } else {
+            return res.status(400).send('Please upload a JSON file or paste JSON data.');
         }
 
         let facultyArray;
         try {
-            facultyArray = JSON.parse(jsonData);
+            facultyArray = JSON.parse(rawJson);
         } catch (e) {
             return res.status(400).send('Invalid JSON format');
         }

@@ -454,6 +454,90 @@ media: [File Buffer] (Image/PDF/Word) (optional)
                 </div>
             </section>
 
+            <!-- Faculty Directory -->
+            <section id="faculty" class="mb-16 scroll-mt-24">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <i data-feather="users" class="text-cyan-500"></i> Faculty Directory
+                </h2>
+                <div class="space-y-6">
+                    <div class="endpoint-card bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div class="flex items-center gap-4 bg-gray-50 px-6 py-4 border-b border-gray-200">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">GET</span>
+                            <code class="text-sm font-semibold text-gray-900">/api/faculty</code>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-sm text-gray-600 mb-4">Lists all active faculty members with search and pagination. Requires <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">x-session-id</code> header.</p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Query Parameters</h4>
+                                    <div class="bg-gray-100 rounded-lg p-4 font-mono text-xs text-gray-800 space-y-1">
+                                        <div><code>?search=john</code> <span class="text-gray-500">// name, ID, or designation</span></div>
+                                        <div><code>?page=1</code> <span class="text-gray-500">// page number</span></div>
+                                        <div><code>?limit=50</code> <span class="text-gray-500">// results per page</span></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">200 Response</h4>
+                                    <div class="bg-gray-900 rounded-lg p-4 font-mono text-xs text-green-300 overflow-x-auto">
+{
+  "faculty": [
+    {
+      "id": 1,
+      "employee_id": "FAC001",
+      "name": "Dr. John Smith",
+      "designation": "Professor",
+      "department": "Computer Science",
+      "email": "john@college.edu",
+      "phone": "9876543210",
+      "qualification": "PhD",
+      "specialization": "Machine Learning",
+      "profile_image": "https://...",
+      "is_active": true
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div class="flex items-center gap-4 bg-gray-50 px-6 py-4 border-b border-gray-200">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">GET</span>
+                            <code class="text-sm font-semibold text-gray-900">/api/faculty/:id</code>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-sm text-gray-600 mb-4">Returns a single faculty member by internal ID.</p>
+                            <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">200 Response</h4>
+                            <div class="bg-gray-900 rounded-lg p-4 font-mono text-xs text-green-300 overflow-x-auto">
+{
+  "faculty": {
+    "id": 1,
+    "employee_id": "FAC001",
+    "name": "Dr. John Smith",
+    "designation": "Professor",
+    "department": "Computer Science",
+    "email": "john@college.edu",
+    "phone": "9876543210",
+    "qualification": "PhD",
+    "specialization": "Machine Learning",
+    "profile_image": "https://...",
+    "is_active": true
+  }
+}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 

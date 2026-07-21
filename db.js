@@ -66,7 +66,8 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN barcode_id TEXT",
       "ALTER TABLE users ADD COLUMN profile_complete BOOLEAN DEFAULT 0",
       "ALTER TABLE users ADD COLUMN profile_image TEXT",
-      "ALTER TABLE users ADD COLUMN last_active_at DATETIME"
+      "ALTER TABLE users ADD COLUMN last_active_at DATETIME",
+      "ALTER TABLE faculty ADD COLUMN profile_image TEXT"
     ];
 
     for (const sql of columns) {
