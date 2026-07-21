@@ -1087,7 +1087,7 @@ router.get('/faculty', async (req, res) => {
 });
 
 router.get('/faculty/new', (req, res) => {
-    res.render('faculty-form', { faculty: null, departments: [] });
+    res.render('faculty-form', { faculty: null });
 });
 
 router.get('/faculty/:id/edit', async (req, res) => {
@@ -1097,8 +1097,7 @@ router.get('/faculty/:id/edit', async (req, res) => {
         if (facultyRes.rows.length === 0) return res.status(404).send('Faculty not found');
 
         res.render('faculty-form', {
-            faculty: facultyRes.rows[0],
-            departments: []
+            faculty: facultyRes.rows[0]
         });
     } catch (err) {
         res.status(500).send('Error: ' + err.message);

@@ -1,111 +1,76 @@
-<%- include('partials/head', { title: faculty ? 'Edit Faculty' : 'Add Faculty' }) %>
-<%- include('partials/sidebar', { active: 'faculty' }) %>
-
-<main class="main-content">
-    <div class="page-header">
-        <h1><%= faculty ? 'Edit Faculty' : 'Add Faculty' %></h1>
-        <a href="/admin/faculty" class="btn btn-secondary">Back to List</a>
-    </div>
-
-    <% if (locals.flash) { %>
-        <div class="flash flash-<%= flash.type %>"><%= flash.message %></div>
-    <% } %>
-
-    <div class="card">
-        <form method="POST" action="<%= faculty ? '/admin/faculty/' + faculty.id : '/admin/faculty' %>" class="form-grid">
-            <div class="form-group">
-                <label for="employee_id">Employee ID <span class="required">*</span></label>
-                <input type="text" id="employee_id" name="employee_id" value="<%= faculty ? faculty.employee_id : '' %>" required <%= faculty ? 'readonly' : '' %>>
+<%- include('partials/head') %>
+<div class="flex">
+    <%- include('partials/sidebar') %>
+    <main class="ml-64 flex-1 p-8 min-h-screen bg-gray-50">
+        <div class="mb-8">
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="/admin/faculty" class="hover:text-blue-600">Faculty</a>
+                <span>/</span>
+                <span class="text-gray-900 font-medium"><%= faculty ? 'Edit' : 'Add' %></span>
             </div>
+            <h1 class="text-2xl font-bold text-gray-900"><%= faculty ? 'Edit Faculty' : 'Add Faculty' %></h1>
+        </div>
 
-            <div class="form-group">
-                <label for="name">Name <span class="required">*</span></label>
-                <input type="text" id="name" name="name" value="<%= faculty ? faculty.name : '' %>" required>
-            </div>
+        <% if (locals.flash) { %>
+        <div class="mb-5 flex items-center gap-2 bg-green-100 border border-green-300 text-green-700 text-sm px-4 py-3 rounded-xl">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <%= flash.message %>
+        </div>
+        <% } %>
 
-            <div class="form-group">
-                <label for="designation">Designation</label>
-                <input type="text" id="designation" name="designation" value="<%= faculty ? faculty.designation : '' %>" placeholder="e.g., Assistant Professor, Professor, HOD">
-            </div>
-
-            <div class="form-group">
-                <label for="department">Department</label>
-                <div style="display: flex; gap: 8px;">
-                    <select id="department" name="department" class="form-input" style="flex: 1;">
-                        <option value="">Select Department</option>
-                        <% departments.forEach(d => { %>
-                            <option value="<%= d %>" <%= faculty && faculty.department === d ? 'selected' : '' %>><%= d %></option>
-                        <% }) %>
-                        <option value="__new__">+ Add New Department</option>
-                    </select>
-                    <input type="text" id="new_department" name="new_department" placeholder="New department name" style="display: none; flex: 1;">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-2xl">
+            <form method="POST" action="<%= faculty ? '/admin/faculty/' + faculty.id : '/admin/faculty' %>">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Employee ID <span class="text-red-500">*</span></label>
+                        <input type="text" name="employee_id" value="<%= faculty ? faculty.employee_id : '' %>" required <%= faculty ? 'readonly' : '' %> class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 <%= faculty ? 'bg-gray-50 text-gray-500' : '' %>">
+                    </div>
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="name" value="<%= faculty ? faculty.name : '' %>" required class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Designation</label>
+                        <input type="text" name="designation" value="<%= faculty ? faculty.designation : '' %>" placeholder="e.g., Professor, HOD" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Department</label>
+                        <input type="text" name="department" value="<%= faculty ? faculty.department : '' %>" placeholder="e.g., Computer Science" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Email</label>
+                        <input type="email" name="email" value="<%= faculty ? faculty.email : '' %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Phone</label>
+                        <input type="tel" name="phone" value="<%= faculty ? faculty.phone : '' %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Qualification</label>
+                        <input type="text" name="qualification" value="<%= faculty ? faculty.qualification : '' %>" placeholder="e.g., PhD, M.Tech" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    </div>
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 block mb-1.5">Specialization</label>
+                        <input type="text" name="specialization" value="<%= faculty ? faculty.specialization : '' %>" placeholder="e.g., Machine Learning" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    </div>
+                    <div class="flex items-center">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="is_active" <%= (faculty ? faculty.is_active : true) ? 'checked' : '' %> class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="text-sm font-semibold text-gray-700">Active</span>
+                        </label>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" value="<%= faculty ? faculty.email : '' %>">
-            </div>
+                <div class="flex gap-3 mt-8 pt-6 border-t border-gray-100">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors shadow-sm">
+                        <%= faculty ? 'Update Faculty' : 'Create Faculty' %>
+                    </button>
+                    <a href="/admin/faculty" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
 
-            <div class="form-group">
-                <label for="phone">Phone</label>
-                <input type="tel" id="phone" name="phone" value="<%= faculty ? faculty.phone : '' %>">
-            </div>
-
-            <div class="form-group">
-                <label for="qualification">Qualification</label>
-                <input type="text" id="qualification" name="qualification" value="<%= faculty ? faculty.qualification : '' %>" placeholder="e.g., PhD, M.Tech, M.Sc">
-            </div>
-
-            <div class="form-group">
-                <label for="specialization">Specialization</label>
-                <input type="text" id="specialization" name="specialization" value="<%= faculty ? faculty.specialization : '' %>" placeholder="e.g., Machine Learning, VLSI, Thermodynamics">
-            </div>
-
-            <div class="form-group" style="flex-direction: row; align-items: center;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" name="is_active" <%= (faculty ? faculty.is_active : true) ? 'checked' : '' %>> Active
-                </label>
-            </div>
-
-            <div class="form-actions" style="grid-column: 1 / -1; display: flex; gap: 12px; margin-top: 16px;">
-                <button type="submit" class="btn btn-primary"><%= faculty ? 'Update Faculty' : 'Create Faculty' %></button>
-                <a href="/admin/faculty" class="btn btn-outline">Cancel</a>
-            </div>
-        </form>
-    </div>
-</main>
-
-<script>
-document.getElementById('department').addEventListener('change', function() {
-    const newDeptInput = document.getElementById('new_department');
-    if (this.value === '__new__') {
-        newDeptInput.style.display = 'block';
-        newDeptInput.required = true;
-        this.required = false;
-    } else {
-        newDeptInput.style.display = 'none';
-        newDeptInput.required = false;
-        this.required = true;
-    }
-});
-
-// Handle form submission to use new department value
-document.querySelector('form').addEventListener('submit', function(e) {
-    const deptSelect = document.getElementById('department');
-    const newDeptInput = document.getElementById('new_department');
-    if (deptSelect.value === '__new__' && newDeptInput.value.trim()) {
-        // Create a hidden input with the new department value
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = 'department';
-        hidden.value = newDeptInput.value.trim();
-        this.appendChild(hidden);
-        deptSelect.disabled = true; // Disable original so it doesn't send __new__
-    }
-});
-</script>
-
-<script src="/js/admin-common.js"></script>
 </body>
 </html>
