@@ -43,6 +43,24 @@ async function initDb() {
       );
     `);
 
+    // 2. Faculty Table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS faculty (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        designation TEXT,
+        department TEXT,
+        email TEXT,
+        phone TEXT,
+        qualification TEXT,
+        specialization TEXT,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 2. Ensure columns are present (Simple safeguards for existing tables)
     const columns = [
       "ALTER TABLE users ADD COLUMN barcode_id TEXT",
@@ -58,6 +76,25 @@ async function initDb() {
         // Silently skip if column already exists or table is locked
       }
     }
+
+    // 3. Faculty Table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS faculty (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        designation TEXT,
+        department TEXT,
+        email TEXT,
+        phone TEXT,
+        qualification TEXT,
+        specialization TEXT,
+        profile_image TEXT,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
 
     console.log('✅ Database initialized successfully');
   } catch (error) {

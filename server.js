@@ -11,6 +11,7 @@ const apiRoutes = require('./routes/api');
 const appRoutes = require('./routes/app');
 const idRoutes = require('./routes/id');
 const profileRoutes = require('./routes/profile');
+const facultyRoutes = require('./routes/faculty');
 const adminRoutes = require('./routes/admin');
 const { logActivity } = require('./utils/activityLogger');
 
@@ -63,6 +64,9 @@ app.use('/id', idRoutes);
 // Profile completion system
 app.use('/profile', profileRoutes);
 
+// Faculty Directory (App API)
+app.use('/api/faculty', facultyRoutes);
+
 // Social Campus Feed
 app.use('/social', require('./routes/social'));
 
@@ -77,7 +81,7 @@ app.get('/', (req, res) => {
     res.json({
         status: "success",
         message: "ITS College Backend API is successfully running on Vercel 🚀",
-        endpoints: ["/auth/login", "/auth/logout", "/api/profile", "/api/attendance/overall", "/api/timetable"]
+        endpoints: ["/auth/login", "/auth/logout", "/api/profile", "/api/attendance/overall", "/api/timetable", "/api/faculty", "/api/faculty/:id"]
     });
 });
 

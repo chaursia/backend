@@ -1038,4 +1038,205 @@ router.post('/app-settings', async (req, res) => {
     }
 });
 
+// ─────────────────────────────────────────────
+//  FACULTY MANAGEMENT
+// ─────────────────────────────────────────────
+
+router.get('/faculty', async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const search = req.query.q || '';
+    const department = req.query.department || '';
+
+    try {
+        let sql = 'SELECT * FROM faculty WHERE 1=1';
+        let countSql = 'SELECT COUNT(*) as count FROM faculty WHERE 1=1';
+        const args = [];
+
+        if (search) {
+            const pattern = `%${search}%`;
+            sql += ' AND (name LIKE ? OR employee_id LIKE ? OR designation LIKE ? OR department LIKE ?)';
+            countSql += ' AND (name LIKE ? OR employee_id LIKE ? OR designation LIKE ? OR department LIKE ?)';
+            args.push(pattern, pattern, pattern, pattern);
+        }
+
+        if (department) {
+            sql += ' AND department = ?';
+            countSql += ' AND department = ?';
+            args.push(department);
+        }
+
+        sql += ' ORDER BY name ASC LIMIT ? OFFSET ?';
+        const queryArgs = [...args, limit, offset];
+
+        const [facultyRes, countRes, deptsRes] = await Promise.all([
+            db.execute({ sql, args: queryArgs }),
+            db.execute({ sql: countSql, args }),
+            db.execute('SELECT DISTINCT department FROM faculty WHERE department IS NOT NULL ORDER BY department ASC')
+        ]);
+
+        const totalFaculty = countRes.rows[0].count;
+        const totalPages = Math.ceil(totalFaculty / limit);
+
+        res.render('faculty', {
+            faculty: facultyRes.rows,
+            page,
+            totalPages,
+            totalFaculty,
+            search,
+            department,
+            departments: deptsRes.rows.map(r => r.department)
+        });
+    } catch (err) {
+        res.status(500).send('Error loading faculty: ' + err.message);
+    }
+});
+
+router.get('/faculty/new', (req, res) => {
+    res.render('faculty-form', { faculty: null, departments: [] });
+});
+
+router.get('/faculty/:id/edit', async (req, res) => {
+    try {
+        const [facultyRes, deptsRes] = await Promise.all([
+            db.execute({ sql: 'SELECT * FROM faculty WHERE id = ?', args: [req.params.id] }),
+            db.execute('SELECT DISTINCT department FROM faculty WHERE department IS NOT NULL ORDER BY department ASC')
+        ]);
+
+        if (facultyRes.rows.length === 0) return res.status(404).send('Faculty not found');
+
+        res.render('faculty-form', {
+            faculty: facultyRes.rows[0],
+            departments: deptsRes.rows.map(r => r.department)
+        });
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+router.post('/faculty', async (req, res) => {
+    const { employee_id, name, designation, department, email, phone, qualification, specialization, is_active } = req.body;
+    try {
+        await db.execute({
+            sql: `INSERT INTO faculty (employee_id, name, designation, department, email, phone, qualification, specialization, is_active)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [employee_id, name, designation, department, email, phone, qualification, specialization, is_active === 'on' ? 1 : 0]
+        });
+        await logAudit(req.adminUser, 'create_faculty', 'faculty', employee_id, { name, department });
+        res.redirect('/admin/faculty?success=1');
+    } catch (err) {
+        res.status(500).send('Create failed: ' + err.message);
+    }
+});
+
+router.post('/faculty/:id', async (req, res) => {
+    const { employee_id, name, designation, department, email, phone, qualification, specialization, is_active } = req.body;
+    try {
+        await db.execute({
+            sql: `UPDATE faculty SET
+                  employee_id = ?, name = ?, designation = ?, department = ?,
+                  email = ?, phone = ?, qualification = ?, specialization = ?,
+                  is_active = ?, updated_at = CURRENT_TIMESTAMP
+                  WHERE id = ?`,
+            args: [employee_id, name, designation, department, email, phone, qualification, specialization, is_active === 'on' ? 1 : 0, req.params.id]
+        });
+        await logAudit(req.adminUser, 'update_faculty', 'faculty', req.params.id, { name, department });
+        res.redirect(`/admin/faculty/${req.params.id}/edit?saved=1`);
+    } catch (err) {
+        res.status(500).send('Update failed: ' + err.message);
+    }
+});
+
+router.post('/faculty/:id/delete', async (req, res) => {
+    try {
+        await db.execute({ sql: 'DELETE FROM faculty WHERE id = ?', args: [req.params.id] });
+        await logAudit(req.adminUser, 'delete_faculty', 'faculty', req.params.id);
+        res.redirect('/admin/faculty?deleted=1');
+    } catch (err) {
+        res.status(500).send('Delete failed: ' + err.message);
+    }
+});
+
+router.get('/faculty/import', (req, res) => {
+    res.render('faculty-import', { flash: req.query.success ? { type: 'success', message: 'Faculty imported successfully' } : null });
+});
+
+router.post('/faculty/import', async (req, res) => {
+    try {
+        const { jsonData } = req.body;
+        if (!jsonData || !jsonData.trim()) {
+            return res.status(400).send('JSON data is required');
+        }
+
+        let facultyArray;
+        try {
+            facultyArray = JSON.parse(jsonData);
+        } catch (e) {
+            return res.status(400).send('Invalid JSON format');
+        }
+
+        if (!Array.isArray(facultyArray)) {
+            return res.status(400).send('JSON must be an array of faculty objects');
+        }
+
+        let created = 0;
+        let updated = 0;
+        let errors = [];
+
+        for (const f of facultyArray) {
+            try {
+                if (!f.employee_id || !f.name) {
+                    errors.push(`Missing employee_id or name for: ${JSON.stringify(f)}`);
+                    continue;
+                }
+
+                const existing = await db.execute({
+                    sql: 'SELECT id FROM faculty WHERE employee_id = ?',
+                    args: [f.employee_id]
+                });
+
+                if (existing.rows.length > 0) {
+                    await db.execute({
+                        sql: `UPDATE faculty SET
+                              name = ?, designation = ?, department = ?, email = ?,
+                              phone = ?, qualification = ?, specialization = ?,
+                              is_active = ?, updated_at = CURRENT_TIMESTAMP
+                              WHERE employee_id = ?`,
+                        args: [
+                            f.name, f.designation || null, f.department || null, f.email || null,
+                            f.phone || null, f.qualification || null, f.specialization || null,
+                            f.is_active !== undefined ? (f.is_active ? 1 : 0) : 1,
+                            f.employee_id
+                        ]
+                    });
+                    updated++;
+                } else {
+                    await db.execute({
+                        sql: `INSERT INTO faculty (employee_id, name, designation, department, email, phone, qualification, specialization, is_active)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        args: [
+                            f.employee_id, f.name, f.designation || null, f.department || null,
+                            f.email || null, f.phone || null, f.qualification || null,
+                            f.specialization || null, f.is_active !== undefined ? (f.is_active ? 1 : 0) : 1
+                        ]
+                    });
+                    created++;
+                }
+            } catch (e) {
+                errors.push(`${f.employee_id || 'unknown'}: ${e.message}`);
+            }
+        }
+
+        await logAudit(req.adminUser, 'import_faculty', 'faculty', 'bulk', { created, updated, errors: errors.length });
+
+        const flash = { type: 'success', message: `Import complete: ${created} created, ${updated} updated` };
+        if (errors.length) flash.message += `, ${errors.length} errors`;
+
+        res.render('faculty-import', { flash });
+    } catch (err) {
+        res.status(500).send('Import failed: ' + err.message);
+    }
+});
+
 module.exports = router;

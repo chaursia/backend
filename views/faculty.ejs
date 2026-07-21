@@ -1,0 +1,99 @@
+<%- include('partials/head', { title: 'Faculty Management' }) %>
+<%- include('partials/sidebar', { active: 'faculty' }) %>
+
+<main class="main-content">
+    <div class="page-header">
+        <h1>Faculty Management</h1>
+        <div class="header-actions">
+            <a href="/admin/faculty/new" class="btn btn-primary">Add Faculty</a>
+            <a href="/admin/faculty/import" class="btn btn-secondary">Import JSON</a>
+        </div>
+    </div>
+
+    <% if (locals.flash) { %>
+        <div class="flash flash-<%= flash.type %>"><%= flash.message %></div>
+    <% } else if (req.query.success) { %>
+        <div class="flash flash-success">Faculty created successfully</div>
+    <% } else if (req.query.saved) { %>
+        <div class="flash flash-success">Faculty updated successfully</div>
+    <% } else if (req.query.deleted) { %>
+        <div class="flash flash-success">Faculty deleted successfully</div>
+    <% } %>
+
+    <div class="card">
+        <div class="card-header">
+            <form method="GET" class="search-form" style="display: flex; gap: 12px; align-items: center;">
+                <input type="text" name="q" placeholder="Search name, ID, designation, department..." value="<%= search %>" class="form-input" style="max-width: 300px;">
+                
+                <select name="department" class="form-input" style="max-width: 200px;">
+                    <option value="">All Departments</option>
+                    <% departments.forEach(d => { %>
+                        <option value="<%= d %>" <%= department === d ? 'selected' : '' %>><%= d %></option>
+                    <% }) %>
+                </select>
+
+                <button type="submit" class="btn btn-secondary">Filter</button>
+                <% if (search || department) { %>
+                    <a href="/admin/faculty" class="btn btn-outline">Clear</a>
+                <% } %>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Designation</th>
+                        <th>Department</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (faculty.length === 0) { %>
+                        <tr><td colspan="8" class="text-center">No faculty records found</td></tr>
+                    <% } else { %>
+                        <% faculty.forEach(f => { %>
+                            <tr>
+                                <td><code><%= f.employee_id %></code></td>
+                                <td><%= f.name %></td>
+                                <td><%= f.designation || '-' %></td>
+                                <td><%= f.department || '-' %></td>
+                                <td><%= f.email || '-' %></td>
+                                <td><%= f.phone || '-' %></td>
+                                <td>
+                                    <span class="badge <%= f.is_active ? 'badge-success' : 'badge-danger' %>">
+                                        <%= f.is_active ? 'Active' : 'Inactive' %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="/admin/faculty/<%= f.id %>/edit" class="btn btn-sm btn-secondary">Edit</a>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+
+        <% if (totalPages > 1) { %>
+            <div class="pagination">
+                <% if (page > 1) { %>
+                    <a href="/admin/faculty?page=<%= page - 1 %>&q=<%= encodeURIComponent(search) %>&department=<%= encodeURIComponent(department) %>" class="btn btn-outline">Previous</a>
+                <% } %>
+                <span class="pagination-info">Page <%= page %> of <%= totalPages %> (<%= totalFaculty %> total)</span>
+                <% if (page < totalPages) { %>
+                    <a href="/admin/faculty?page=<%= page + 1 %>&q=<%= encodeURIComponent(search) %>&department=<%= encodeURIComponent(department) %>" class="btn btn-outline">Next</a>
+                <% } %>
+            </div>
+        <% } %>
+    </div>
+</main>
+
+<script src="/js/admin-common.js"></script>
+</body>
+</html>

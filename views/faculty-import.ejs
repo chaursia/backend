@@ -1,0 +1,63 @@
+<%- include('partials/head', { title: 'Import Faculty (JSON)' }) %>
+<%- include('partials/sidebar', { active: 'faculty' }) %>
+
+<main class="main-content">
+    <div class="page-header">
+        <h1>Import Faculty from JSON</h1>
+        <a href="/admin/faculty" class="btn btn-secondary">Back to List</a>
+    </div>
+
+    <% if (locals.flash) { %>
+        <div class="flash flash-<%= flash.type %>"><%= flash.message %></div>
+    <% } %>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>JSON Import Format</h3>
+        </div>
+        <div class="card-body">
+            <p>Paste an array of faculty objects. Each object supports these fields:</p>
+            <pre><code>[
+  {
+    "employee_id": "FAC001",
+    "name": "Dr. John Smith",
+    "designation": "Professor",
+    "department": "Computer Science",
+    "email": "john.smith@college.edu",
+    "phone": "9876543210",
+    "qualification": "PhD",
+    "specialization": "Machine Learning",
+    "is_active": true
+  }
+]</code></pre>
+            <p><strong>Required fields:</strong> <code>employee_id</code>, <code>name</code></p>
+            <p>If <code>employee_id</code> exists, the record will be updated. Otherwise, a new record is created.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <form method="POST" action="/admin/faculty/import">
+            <div class="form-group">
+                <label for="jsonData">JSON Data <span class="required">*</span></label>
+                <textarea id="jsonData" name="jsonData" rows="20" style="font-family: monospace; width: 100%;" required placeholder='[
+  {
+    "employee_id": "FAC001",
+    "name": "Dr. John Smith",
+    "designation": "Professor",
+    "department": "Computer Science",
+    "email": "john.smith@college.edu",
+    "phone": "9876543210",
+    "qualification": "PhD",
+    "specialization": "Machine Learning",
+    "is_active": true
+  }
+]'></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Import Faculty</button>
+        </form>
+    </div>
+</main>
+
+<script src="/js/admin-common.js"></script>
+</body>
+</html>
