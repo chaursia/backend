@@ -166,4 +166,39 @@ router.get('/calendar', async (req, res) => {
     } catch (error) { handleError(res, error); }
 });
 
+// GET /api/class
+router.get('/class', async (req, res) => {
+    try {
+        const session = sessionStore.decrypt(req.sessionId);
+        if (!session || !session.user_id) {
+            return res.status(401).json({ error: 'Invalid session' });
+        }
+
+        const userRes = await db.execute({
+            sql: 'SELECT section FROM users WHERE id = ?',
+            args: [session.user_id]
+        });
+
+        if (userRes.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const section = userRes.rows[0].section;
+        if (!section) {
+            return res.status(400).json({ error: 'No section assigned to your account' });
+        }
+
+        const students = await db.execute({
+            sql: 'SELECT name, roll_no, profile_image, phone FROM users WHERE section = ? ORDER BY roll_no ASC',
+            args: [section]
+        });
+
+        res.json({
+            section,
+            total: students.rows.length,
+            students: students.rows
+        });
+    } catch (error) { handleError(res, error); }
+});
+
 module.exports = router;
