@@ -58,37 +58,19 @@ router.use(async (req, res, next) => {
 
 router.get('/', async (req, res) => {
     try {
-        const { search, page = 1, limit = 50 } = req.query;
-        const offset = (page - 1) * limit;
-
-        let sql = 'SELECT * FROM faculty WHERE is_active = 1';
-        let countSql = 'SELECT COUNT(*) as count FROM faculty WHERE is_active = 1';
+        const { search } = req.query;
         const args = [];
 
+        let sql = 'SELECT * FROM faculty WHERE is_active = 1';
         if (search) {
             const pattern = `%${search}%`;
             sql += ' AND (name LIKE ? OR employee_id LIKE ? OR designation LIKE ?)';
-            countSql += ' AND (name LIKE ? OR employee_id LIKE ? OR designation LIKE ?)';
             args.push(pattern, pattern, pattern);
         }
+        sql += ' ORDER BY name ASC';
 
-        sql += ' ORDER BY name ASC LIMIT ? OFFSET ?';
-        const queryArgs = [...args, parseInt(limit), offset];
-
-        const [dataRes, countRes] = await Promise.all([
-            db.execute({ sql, args: queryArgs }),
-            db.execute({ sql: countSql, args })
-        ]);
-
-        res.json({
-            faculty: dataRes.rows,
-            pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
-                total: countRes.rows[0].count,
-                totalPages: Math.ceil(countRes.rows[0].count / limit)
-            }
-        });
+        const dataRes = await db.execute({ sql, args });
+        res.json({ faculty: dataRes.rows });
     } catch (error) {
         handleError(res, error);
     }

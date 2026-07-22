@@ -1132,7 +1132,7 @@ router.post('/app-settings', async (req, res) => {
 
 router.get('/faculty', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
-    const limit = 20;
+    const limit = 30;
     const offset = (page - 1) * limit;
     const search = req.query.q || '';
 
@@ -1238,6 +1238,7 @@ router.post('/faculty/import', importUpload.single('jsonFile'), async (req, res)
             return res.status(400).send('JSON must be an array of faculty objects');
         }
 
+        const totalInFile = facultyArray.length;
         let created = 0;
         let updated = 0;
         let errors = [];
@@ -1288,7 +1289,7 @@ router.post('/faculty/import', importUpload.single('jsonFile'), async (req, res)
 
         await logAudit(req.adminUser, 'import_faculty', 'faculty', 'bulk', { created, updated, errors: errors.length });
 
-        const flash = { type: 'success', message: `Import complete: ${created} created, ${updated} updated` };
+        const flash = { type: 'success', message: `Import complete: ${created} created, ${updated} updated (${totalInFile} records in file)` };
         if (errors.length) flash.message += `, ${errors.length} errors`;
 
         res.render('faculty-import', { flash });
