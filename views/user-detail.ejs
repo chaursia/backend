@@ -19,6 +19,10 @@
             </div>
         </div>
 
+        <% if (locals.flash) { %>
+        <div class="mb-5 px-4 py-3 rounded-xl text-sm font-medium <%= flash.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>"><%= flash.message %></div>
+        <% } %>
+
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
             <!-- Profile Card -->
             <div class="xl:col-span-1">
@@ -42,12 +46,12 @@
                         <% } %>
                     </div>
                     <!-- Ban section -->
-                    <% if (activeBan) { %>
+                    <% if (ban) { %>
                     <div class="mt-5 bg-red-50 border border-red-200 rounded-xl p-4 text-left">
                         <p class="text-red-700 text-xs font-semibold uppercase tracking-wide mb-1">⚠ Currently Banned</p>
-                        <p class="text-red-600 text-sm"><%= activeBan.reason %></p>
-                        <% if (activeBan.expires_at) { %>
-                        <p class="text-red-400 text-xs mt-1">Expires: <%= new Date(activeBan.expires_at).toLocaleDateString('en-IN') %></p>
+                        <p class="text-red-600 text-sm"><%= ban.reason %></p>
+                        <% if (ban.expires_at) { %>
+                        <p class="text-red-400 text-xs mt-1">Expires: <%= new Date(ban.expires_at).toLocaleDateString('en-IN') %></p>
                         <% } else { %>
                         <p class="text-red-400 text-xs mt-1">Permanent ban</p>
                         <% } %>

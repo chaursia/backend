@@ -323,7 +323,13 @@ router.get('/users/:id', async (req, res) => {
             .eq('is_active', true)
             .maybeSingle();
 
-        res.render('user-detail', { user, ban });
+        res.render('user-detail', {
+            user,
+            ban,
+            flash: req.query.banned ? { type: 'success', message: 'User has been banned.' } :
+                   req.query.unbanned ? { type: 'success', message: 'Ban has been lifted.' } :
+                   req.query.saved ? { type: 'success', message: 'Profile updated successfully.' } : null
+        });
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
     }
@@ -336,7 +342,7 @@ router.get('/users/:id/edit', async (req, res) => {
             args: [req.params.id]
         });
         if (userRes.rows.length === 0) return res.status(404).send('User not found');
-        res.render('user-edit', { user: userRes.rows[0] });
+        res.render('user-edit', { user: userRes.rows[0], success: req.query.saved || null });
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
     }
@@ -350,7 +356,7 @@ router.post('/users/:id/edit', async (req, res) => {
             args: [name, roll_no, email, course, branch, parseInt(semester), barcode_id, req.params.id]
         });
 
-        await logAudit(req.adminUser, 'edit_user', 'user', req.params.id, { name, roll_no });
+            await logAudit(req.adminUser, 'edit_user', 'user', req.params.id, { name, roll_no });
         res.redirect(`/admin/users/${req.params.id}?saved=1`);
     } catch (err) {
         res.status(500).send('Save failed: ' + err.message);
@@ -367,6 +373,16 @@ router.post('/users/:id/action', async (req, res) => {
         const user = userRes.rows[0];
 
         if (_action === 'ban') {
+            // Check if already banned
+            const { data: existingBan } = await supabase
+                .from('user_bans')
+                .select('id')
+                .eq('college_id', user.college_id)
+                .eq('is_active', true)
+                .maybeSingle();
+            if (existingBan) {
+                return res.status(400).send('User is already banned.');
+            }
             const { error } = await supabase.from('user_bans').insert({
                 college_id: user.college_id,
                 user_name: user.name,
@@ -376,6 +392,16 @@ router.post('/users/:id/action', async (req, res) => {
             });
             if (error) throw error;
             await logAudit(req.adminUser, 'ban_user', 'user', userId, { reason });
+            return res.redirect(`/admin/users/${userId}?banned=1`);
+        } else if (_action === 'unban') {
+            const { error } = await supabase
+                .from('user_bans')
+                .update({ is_active: false, updated_at: new Date() })
+                .eq('college_id', user.college_id)
+                .eq('is_active', true);
+            if (error) throw error;
+            await logAudit(req.adminUser, 'unban_user', 'user', userId);
+            return res.redirect(`/admin/users/${userId}?unbanned=1`);
         } else if (_action === 'delete') {
             await db.execute({ sql: 'DELETE FROM users WHERE id = ?', args: [userId] });
             await logAudit(req.adminUser, 'delete_user', 'user', userId, { name: user.name });
