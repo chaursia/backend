@@ -141,7 +141,22 @@ const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'placeholder';
 const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
 
+// Fixup: ensure existing bans have is_active set (legacy records before column default)
+async function fixupBans() {
+    try {
+        const { error } = await supabase
+            .from('user_bans')
+            .update({ is_active: true })
+            .is('is_active', null);
+        if (error) throw error;
+        console.log('✅ Fixed existing bans (is_active = null → true)');
+    } catch (e) {
+        // Silently skip if table/column doesn't exist yet
+    }
+}
+
 // Automatically init DB on start
 initDb();
+fixupBans();
 
 module.exports = { db, checkConnection, supabase };

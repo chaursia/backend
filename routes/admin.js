@@ -435,6 +435,12 @@ router.get('/bans', async (req, res) => {
 
 router.post('/bans/:id/unban', async (req, res) => {
     try {
+        const { data: banRecord } = await supabase
+            .from('user_bans')
+            .select('user_name, college_id')
+            .eq('id', req.params.id)
+            .single();
+
         const { error } = await supabase
             .from('user_bans')
             .update({ is_active: false })
@@ -444,10 +450,12 @@ router.post('/bans/:id/unban', async (req, res) => {
         await logAudit(req.adminUser, 'unban_user', 'ban_record', req.params.id);
         
         // Log to Activity Feed
-        logActivity('unban', 'User Unbanned', `${banRecord.user_name || banRecord.college_id} has been unsuspended.`, {
-            icon: 'unlock',
-            color: 'green'
-        }).catch(() => {});
+        if (banRecord) {
+            logActivity('unban', 'User Unbanned', `${banRecord.user_name || banRecord.college_id} has been unsuspended.`, {
+                icon: 'unlock',
+                color: 'green'
+            }).catch(() => {});
+        }
 
         res.redirect('/admin/bans');
     } catch (err) {
