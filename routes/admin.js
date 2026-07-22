@@ -388,7 +388,8 @@ router.post('/users/:id/action', async (req, res) => {
                 user_name: user.name,
                 reason: reason || 'Violation of terms',
                 banned_by: req.adminUser?.id,
-                expires_at: expires_at || null
+                expires_at: expires_at || null,
+                is_active: true
             });
             if (error) throw error;
             await logAudit(req.adminUser, 'ban_user', 'user', userId, { reason });
