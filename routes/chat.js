@@ -248,30 +248,15 @@ router.get('/upload/voice/auth', async (req, res) => {
     }
 });
 
-// GET /api/chat/voice/url/* — return signed B2 download URL (client downloads directly from B2)
-router.get('/voice/url/*', async (req, res) => {
+// GET /api/chat/voice — return signed B2 download URL (client downloads directly from B2)
+router.get('/voice', async (req, res) => {
     try {
-        const fileName = req.params[0];
-        console.log('[voice/url] Requested:', fileName);
-        if (!fileName) return res.status(400).json({ error: 'Missing fileName' });
-        const downloadUrl = await getB2DownloadUrl(fileName);
-        console.log('[voice/url] Returning signed URL');
-        res.json({ url: downloadUrl, fileName: fileName });
-    } catch (e) {
-        console.error('[voice/url] Error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// GET /api/chat/voice/* — proxy/redirect audio from B2
-router.get('/voice/*', async (req, res) => {
-    try {
-        const fileName = req.params[0];
+        const fileName = req.query.fileName;
         console.log('[voice] Requested:', fileName);
-        if (!fileName) return res.status(400).json({ error: 'Missing fileName' });
+        if (!fileName) return res.status(400).json({ error: 'Missing fileName query parameter' });
         const downloadUrl = await getB2DownloadUrl(fileName);
-        console.log('[voice] Redirecting to B2');
-        res.redirect(downloadUrl);
+        console.log('[voice] Returning signed URL');
+        res.json({ url: downloadUrl, fileName: fileName });
     } catch (e) {
         console.error('[voice] Error:', e.message);
         res.status(500).json({ error: e.message });
