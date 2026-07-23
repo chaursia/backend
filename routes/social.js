@@ -171,12 +171,24 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
 
         // 2. Cleanup Cloudinary if media exists
         if (post.media_url) {
-            // Check if it's the piped format: "url|public_id"
-            const parts = post.media_url.split('|');
-            const publicId = parts.length > 1 ? parts[1] : null;
-            
-            if (publicId) {
-                await deleteFromCloudinary(publicId).catch(err => console.error("Cloudinary Cleanup Failed:", err));
+            try {
+                const urls = JSON.parse(post.media_url);
+                if (Array.isArray(urls)) {
+                    for (const entry of urls) {
+                        const parts = entry.split('|');
+                        const publicId = parts.length > 1 ? parts[1] : null;
+                        if (publicId) {
+                            await deleteFromCloudinary(publicId).catch(err => console.error("Cloudinary Cleanup Failed:", err));
+                        }
+                    }
+                }
+            } catch {
+                // Backward compat: single pipe format "url|public_id"
+                const parts = post.media_url.split('|');
+                const publicId = parts.length > 1 ? parts[1] : null;
+                if (publicId) {
+                    await deleteFromCloudinary(publicId).catch(err => console.error("Cloudinary Cleanup Failed:", err));
+                }
             }
         }
 
@@ -200,28 +212,33 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  * POST /social/post
  * Create a new text post with optional media.
  */
-router.post('/post', requireSocialAccess, upload.single('media'), async (req, res) => {
+router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
         const { content } = req.body;
-        if (!content && !req.file) {
+        const files = req.files || [];
+        if (!content && files.length === 0) {
             return res.status(400).json({ error: 'Post must contain text or media.' });
         }
 
-        let mediaUrl = null;
-        let mediaType = null;
-        let publicId = null;
+        let mediaEntries = [];
 
-        if (req.file) {
-            const uploadResult = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
-            mediaUrl = uploadResult.url;
-            mediaType = uploadResult.type;
-            publicId = uploadResult.public_id; // Stored in media_url for simplicity or derived later
+        if (files.length > 0) {
+            for (const file of files) {
+                const uploadResult = await uploadToCloudinary(file.buffer, file.mimetype);
+                mediaEntries.push(`${uploadResult.url}|${uploadResult.public_id}`);
+            }
         }
 
         const postId = crypto.randomUUID();
         await db.execute({
             sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type) VALUES (?, ?, ?, ?, ?)`,
-            args: [postId, req.userId, content || '', publicId ? `${mediaUrl}|${publicId}` : mediaUrl, mediaType]
+            args: [
+                postId,
+                req.userId,
+                content || '',
+                mediaEntries.length > 0 ? JSON.stringify(mediaEntries) : null,
+                mediaEntries.length > 0 ? 'image' : null
+            ]
         });
 
         res.json({ success: true, message: 'Post created.' });
