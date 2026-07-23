@@ -14,15 +14,16 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 class="font-semibold text-gray-900 mb-4">Network Architecture</h2>
             <div class="relative w-full overflow-x-auto">
-                <svg viewBox="0 0 900 220" class="w-full max-w-4xl" xmlns="http://www.w3.org/2000/svg">
+                <svg viewBox="0 0 1100 220" class="w-full max-w-5xl" xmlns="http://www.w3.org/2000/svg">
                     <!-- connection lines -->
-                    <% const lineColor = (s) => s === 'connected' || s === 'reachable' ? '#22c55e' : (s === 'unconfigured' ? '#eab308' : '#ef4444'); %>
+                    <% const lineColor = (s) => s === 'connected' || s === 'reachable' || s === 'configured' ? '#22c55e' : (s === 'unconfigured' ? '#eab308' : '#ef4444'); %>
                     <line x1="150" y1="110" x2="300" y2="40" stroke="<%= lineColor(health.turso) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="300" y2="110" stroke="<%= lineColor(health.supabase) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="300" y2="180" stroke="<%= lineColor(health.smtp) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="550" y2="40" stroke="<%= lineColor(health.cloudinary.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="550" y2="110" stroke="<%= lineColor(health.collegeApi.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="550" y2="180" stroke="<%= lineColor(health.collegeInfo.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="800" y2="110" stroke="<%= lineColor(health.imagekit.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
 
                     <!-- Node: Server -->
                     <rect x="20" y="85" width="130" height="50" rx="10" fill="#1e293b"/>
@@ -59,6 +60,12 @@
                     <rect x="550" y="155" width="130" height="50" rx="10" fill="<%= health.collegeInfo?.status === 'reachable' ? '#dcfce7' : '#fee2e2' %>" stroke="<%= lineColor(health.collegeInfo?.status) %>" stroke-width="2"/>
                     <text x="615" y="180" text-anchor="middle" fill="<%= health.collegeInfo?.status === 'reachable' ? '#16a34a' : '#dc2626' %>" font-size="13" font-weight="bold">College Info</text>
                     <text x="615" y="194" text-anchor="middle" fill="#64748b" font-size="10"><%= health.collegeInfo?.status === 'reachable' ? `HTTP ${health.collegeInfo.code}` : (health.collegeInfo?.status || 'Unreachable') %></text>
+
+                    <!-- Node: ImageKit -->
+                    <% const ikStat = health.imagekit?.status; const ikOk = ikStat === 'configured'; const ikUncfg = ikStat === 'unconfigured'; %>
+                    <rect x="800" y="85" width="120" height="50" rx="10" fill="<%= ikOk ? '#dcfce7' : (ikUncfg ? '#fef9c3' : '#fee2e2') %>" stroke="<%= lineColor(ikStat) %>" stroke-width="2"/>
+                    <text x="860" y="112" text-anchor="middle" fill="<%= ikOk ? '#16a34a' : (ikUncfg ? '#ca8a04' : '#dc2626') %>" font-size="13" font-weight="bold">ImageKit</text>
+                    <text x="860" y="126" text-anchor="middle" fill="#64748b" font-size="10"><%= ikOk ? 'Configured' : (ikUncfg ? 'Unconfigured' : 'Error') %></text>
                 </svg>
             </div>
         </div>
@@ -145,8 +152,8 @@
             </div>
         </div>
 
-        <!-- Cloudinary Status -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+        <!-- Media Services & Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <%
                     let cldColor = 'red';
@@ -162,6 +169,23 @@
                 </div>
                 <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Cloudinary</div>
                 <div class="text-lg font-bold text-<%= cldColor %>-600 capitalize"><%= cldLabel %></div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <%
+                    let ikColor = 'red';
+                    let ikLabel = health.imagekit?.status || 'Unknown';
+                    if (health.imagekit?.status === 'configured') { ikColor = 'green'; ikLabel = 'Configured'; }
+                    if (health.imagekit?.status === 'unconfigured') { ikColor = 'amber'; ikLabel = 'Unconfigured'; }
+                %>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-<%= ikColor %>-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-<%= ikColor %>-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-<%= ikColor %>-500 <%= health.imagekit?.status === 'configured' ? 'animate-pulse' : '' %>"></span>
+                </div>
+                <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">ImageKit</div>
+                <div class="text-lg font-bold text-<%= ikColor %>-600 capitalize"><%= ikLabel %></div>
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

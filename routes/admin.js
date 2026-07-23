@@ -9,6 +9,7 @@ const multer = require('multer');
 const fs = require('fs');
 const crypto = require('crypto');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
+const { getImageKit } = require('../services/imagekitService');
 
 // Configure Multer for email attachments
 // NOTE: Use /tmp for Vercel serverless compatibility (read-only filesystem)
@@ -878,6 +879,16 @@ async function checkCloudinary() {
     }
 }
 
+async function checkImageKit() {
+    try {
+        const ik = await getImageKit();
+        if (!ik) return { status: 'unconfigured' };
+        return { status: 'configured' };
+    } catch (e) {
+        return { status: 'error', message: e.message };
+    }
+}
+
 router.get('/health', async (req, res) => {
     const ms = process.memoryUsage();
     const uptimeSec = process.uptime();
@@ -893,6 +904,7 @@ router.get('/health', async (req, res) => {
         checkEndpoint(API_BASE),
         checkEndpoint(`${API_BASE}/college/information`),
         checkCloudinary(),
+        checkImageKit(),
     ]);
 
     const get = (i, def) => results[i]?.status === 'fulfilled' ? results[i].value : def;
@@ -916,6 +928,7 @@ router.get('/health', async (req, res) => {
             collegeApi: get(7, { status: 'unreachable', code: null }),
             collegeInfo: get(8, { status: 'unreachable', code: null }),
             cloudinary: get(9, { status: 'unreachable', code: null }),
+            imagekit: get(10, { status: 'unreachable' }),
         }
     });
 });
