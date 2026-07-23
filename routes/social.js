@@ -174,7 +174,7 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
 
         // 1. Verify ownership
         const postRes = await db.execute({
-            sql: "SELECT id, media_url, user_id FROM social_posts WHERE id = ?",
+            sql: "SELECT id, media_url, video_file_id, user_id FROM social_posts WHERE id = ?",
             args: [postId]
         });
 
