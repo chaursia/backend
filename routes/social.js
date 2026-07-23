@@ -6,7 +6,7 @@ const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
 const { getApiKey, getUploadServer, uploadVideo: uploadToByse, deleteVideo: deleteFromByse } = require('../services/byseService');
-const { uploadFile: uploadToB2, deleteFile: deleteFromB2, getDownloadUrl: getB2DownloadUrl } = require('../services/b2Service');
+const { uploadFile: uploadToB2, deleteFile: deleteFromB2, getDownloadUrl: getB2DownloadUrl, getUploadAuth: getB2UploadAuth } = require('../services/b2Service');
 
 const router = express.Router();
 
@@ -249,9 +249,9 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  */
 router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
-        const { content, video_url, video_file_id, video_thumbnail } = req.body;
+        const { content, video_url, video_file_id, video_thumbnail, b2_file_id, b2_file_name, original_name } = req.body;
         const files = req.files || [];
-        if (!content && files.length === 0 && !video_url) {
+        if (!content && files.length === 0 && !video_url && !b2_file_id) {
             return res.status(400).json({ error: 'Post must contain text or media.' });
         }
 
@@ -259,6 +259,15 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         let b2FileId = null;
         let b2FileName = null;
 
+        // Client-side B2 upload (bypasses Vercel 4.5MB limit)
+        if (b2_file_id && b2_file_name) {
+            const dlBase = `${req.protocol}://${req.get('host')}/social/download/document`;
+            mediaEntries.push(`${dlBase}/${b2_file_name}|${b2_file_id}|${original_name || 'document'}`);
+            b2FileId = b2_file_id;
+            b2FileName = b2_file_name;
+        }
+
+        // Server-uploaded files via multipart (images, small docs)
         if (files.length > 0) {
             for (const file of files) {
                 if (file.mimetype.startsWith('image/')) {
@@ -324,11 +333,17 @@ router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
 
 /**
  * GET /social/upload/document/auth
- * Unused — documents are now uploaded via multipart through the backend.
- * Kept for backward compatibility.
+ * Returns B2 upload URL + authorization token for client-side upload
+ * (bypasses Vercel's 4.5MB body limit for large documents).
  */
 router.get('/upload/document/auth', requireSocialAccess, async (req, res) => {
-    res.status(400).json({ error: 'Client-side upload disabled. Use multipart upload instead.' });
+    try {
+        const auth = await getB2UploadAuth();
+        if (!auth) return res.status(500).json({ error: 'B2 not configured.' });
+        res.json(auth);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 /**

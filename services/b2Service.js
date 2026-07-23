@@ -86,4 +86,13 @@ async function deleteFile(fileId, fileName) {
     }
 }
 
-module.exports = { uploadFile, deleteFile, getDownloadUrl };
+async function getUploadAuth() {
+    const auth = await authorize();
+    const uploadInfo = await getUploadUrl(auth);
+    return {
+        uploadUrl: uploadInfo.uploadUrl,
+        authorizationToken: uploadInfo.authorizationToken
+    };
+}
+
+module.exports = { uploadFile, deleteFile, getDownloadUrl, getUploadAuth };
