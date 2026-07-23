@@ -5,6 +5,7 @@ const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
 const { uploadVideo: uploadToByse, deleteVideo: deleteFromByse, getUploadServer, getApiKey } = require('../services/byseService');
+const { uploadDocument: uploadToFilelu, deleteDocument: deleteFromFilelu, getApiKey: getFileluApiKey, getUploadServer: getFileluUploadServer } = require('../services/fileluService');
 
 const router = express.Router();
 
@@ -180,7 +181,7 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
 
         // 1. Verify ownership
         const postRes = await db.execute({
-            sql: "SELECT id, media_url, video_file_id, user_id FROM social_posts WHERE id = ?",
+            sql: "SELECT id, media_url, video_file_id, filelu_file_id, user_id FROM social_posts WHERE id = ?",
             args: [postId]
         });
 
@@ -193,7 +194,7 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
             return res.status(403).json({ error: 'You can only delete your own posts.' });
         }
 
-        // 2. Cleanup Cloudinary if media exists
+        // 2. Cleanup Cloudinary images
         if (post.media_url) {
             try {
                 const urls = JSON.parse(post.media_url);
@@ -201,7 +202,7 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
                     for (const entry of urls) {
                         const parts = entry.split('|');
                         const publicId = parts.length > 1 ? parts[1] : null;
-                        if (publicId) {
+                        if (publicId && publicId.length > 20) {
                             await deleteFromCloudinary(publicId).catch(err => console.error("Cloudinary Cleanup Failed:", err));
                         }
                     }
@@ -213,6 +214,11 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
                     await deleteFromCloudinary(publicId).catch(err => console.error("Cloudinary Cleanup Failed:", err));
                 }
             }
+        }
+
+        // Cleanup FileLu documents
+        if (post.filelu_file_id) {
+            await deleteFromFilelu(post.filelu_file_id).catch(err => console.error("FileLu Cleanup Failed:", err));
         }
 
         // Cleanup Byse.sx video
@@ -249,21 +255,32 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         }
 
         let mediaEntries = [];
+        let fileluFileId = null;
 
         if (files.length > 0) {
             for (const file of files) {
-                const uploadResult = await uploadToCloudinary(file.buffer, file.mimetype);
-                mediaEntries.push(`${uploadResult.url}|${uploadResult.public_id}`);
+                if (file.mimetype.startsWith('image/')) {
+                    const uploadResult = await uploadToCloudinary(file.buffer, file.mimetype);
+                    mediaEntries.push(`${uploadResult.url}|${uploadResult.public_id}`);
+                } else {
+                    const result = await uploadToFilelu(file.buffer, file.originalname, file.mimetype);
+                    mediaEntries.push(`${result.url}|${result.fileCode}`);
+                    fileluFileId = result.fileCode;
+                }
             }
         }
 
         const postId = crypto.randomUUID();
         let mediaType = null;
         if (video_url) mediaType = 'video';
-        else if (mediaEntries.length > 0) mediaType = 'image';
+        else if (mediaEntries.length > 0) {
+            const hasImage = files.some(f => f.mimetype.startsWith('image/'));
+            const hasDoc = files.some(f => !f.mimetype.startsWith('image/'));
+            mediaType = hasImage && !hasDoc ? 'image' : 'document';
+        }
 
         await db.execute({
-            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, video_thumbnail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, video_thumbnail, filelu_file_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 postId,
                 req.userId,
@@ -272,7 +289,8 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
                 mediaType,
                 video_url || null,
                 video_file_id || null,
-                video_thumbnail || null
+                video_thumbnail || null,
+                fileluFileId
             ]
         });
 
@@ -295,6 +313,21 @@ router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
 
         const uploadServer = await getUploadServer();
         res.json({ uploadServer, apiKey });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * GET /social/upload/document/auth
+ * Returns FileLu upload server URL and API key for client-side upload.
+ */
+router.get('/upload/document/auth', requireSocialAccess, async (req, res) => {
+    try {
+        const apiKey = await getFileluApiKey();
+        if (!apiKey) return res.status(500).json({ error: 'FileLu not configured.' });
+        const { uploadUrl, sessId } = await getFileluUploadServer();
+        res.json({ uploadServer: uploadUrl, sessId, apiKey });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

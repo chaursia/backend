@@ -75,7 +75,8 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN verify_badge INTEGER DEFAULT 0",
       "ALTER TABLE social_posts ADD COLUMN video_url TEXT",
       "ALTER TABLE social_posts ADD COLUMN video_file_id TEXT",
-      "ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT"
+      "ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT",
+      "ALTER TABLE social_posts ADD COLUMN filelu_file_id TEXT"
     ];
 
     for (const sql of columns) {
