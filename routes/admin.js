@@ -1249,6 +1249,18 @@ router.post('/media-settings/voiddrive', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+//  VOIDDRIVE DEBUG
+// ─────────────────────────────────────────────
+router.get('/debug/voiddrive-file', async (req, res) => {
+    const { getFileInfo, getDownloadUrl } = require('../services/voiddriveService');
+    const fileId = req.query.id;
+    if (!fileId) return res.status(400).json({ error: 'Provide ?id=fileId' });
+    const info = await getFileInfo(fileId);
+    const dl = await getDownloadUrl(fileId);
+    res.json({ fileId: fileId.substring(0, 50) + '...', info, downloadUrl: dl });
+});
+
+// ─────────────────────────────────────────────
 //  FACULTY MANAGEMENT
 // ─────────────────────────────────────────────
 
