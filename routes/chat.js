@@ -251,17 +251,23 @@ router.get('/upload/voice/auth', async (req, res) => {
 // GET /api/chat/voice/*fileName — proxy voice audio from B2 (no redirect for reliable MediaPlayer playback)
 router.get('/voice/*fileName', async (req, res) => {
     try {
-        const downloadUrl = await getB2DownloadUrl(req.params[0]);
-        const response = await fetch(downloadUrl);
+        const fileName = req.params[0];
+        console.log('[voice] Requested:', fileName);
+        const downloadUrl = await getB2DownloadUrl(fileName);
+        console.log('[voice] B2 download URL:', downloadUrl?.substring(0, 80));
+        const response = await fetch(downloadUrl, { signal: AbortSignal.timeout(15000) });
         if (!response.ok) {
             const errBody = await response.text().catch(() => '');
-            return res.status(response.status).json({ error: 'Failed to fetch audio from storage: ' + errBody });
+            console.error('[voice] B2 fetch failed:', response.status, errBody?.substring(0, 200));
+            return res.status(response.status).json({ error: 'B2 fetch failed: ' + errBody?.substring(0, 200) });
         }
         const contentType = response.headers.get('content-type') || 'audio/3gpp';
+        console.log('[voice] B2 response OK, content-type:', contentType, 'size:', response.headers.get('content-length'));
         res.set('Content-Type', contentType);
         const arrayBuffer = await response.arrayBuffer();
         res.send(Buffer.from(arrayBuffer));
     } catch (e) {
+        console.error('[voice] Error:', e.message);
         res.status(500).json({ error: e.message });
     }
 });
