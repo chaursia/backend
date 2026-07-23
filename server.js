@@ -70,6 +70,9 @@ app.use('/api/faculty', facultyRoutes);
 // Social Campus Feed
 app.use('/social', require('./routes/social'));
 
+// Chat System
+app.use('/api/chat', require('./routes/chat'));
+
 // Admin Dashboard UI (Server-Side Rendered)
 app.use('/admin', adminRoutes);
 
@@ -108,6 +111,21 @@ if (require.main === module) {
             icon: 'zap',
             color: 'green'
         }).catch(() => {});
+
+        // Auto-delete chat messages older than 7 days (every hour)
+        const { db } = require('./db');
+        async function cleanOldMessages() {
+            try {
+                const result = await db.execute({
+                    sql: "DELETE FROM chat_messages WHERE created_at < datetime('now', '-7 days')"
+                });
+                if (result.rowsAffected > 0) {
+                    console.log(`🧹 Cleaned ${result.rowsAffected} old chat messages (>7 days)`);
+                }
+            } catch (e) { /* silent */ }
+        }
+        cleanOldMessages();
+        setInterval(cleanOldMessages, 60 * 60 * 1000);
     });
 }
 

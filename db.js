@@ -67,7 +67,10 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN profile_complete BOOLEAN DEFAULT 0",
       "ALTER TABLE users ADD COLUMN profile_image TEXT",
       "ALTER TABLE users ADD COLUMN last_active_at DATETIME",
-      "ALTER TABLE faculty ADD COLUMN profile_image TEXT"
+      "ALTER TABLE faculty ADD COLUMN profile_image TEXT",
+      "ALTER TABLE chat_messages ADD COLUMN is_pinned INTEGER DEFAULT 0",
+      "ALTER TABLE chat_messages ADD COLUMN semester INTEGER",
+      "ALTER TABLE chat_messages ADD COLUMN section TEXT"
     ];
 
     for (const sql of columns) {
@@ -115,6 +118,36 @@ async function initDb() {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 6. Chat Messages Table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        roll_no TEXT,
+        profile_image TEXT,
+        message TEXT,
+        parent_id INTEGER,
+        mentions TEXT DEFAULT '[]',
+        reactions TEXT DEFAULT '{}',
+        message_type TEXT DEFAULT 'text',
+        gif_url TEXT,
+        sticker_url TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 7. Chat Bans Table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS chat_bans (
+        user_id INTEGER PRIMARY KEY,
+        banned_by INTEGER,
+        reason TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
 

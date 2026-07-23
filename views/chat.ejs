@@ -1,0 +1,165 @@
+<%- include('partials/head') %>
+<div class="flex">
+    <%- include('partials/sidebar') %>
+    <main class="ml-64 flex-1 p-8 min-h-screen bg-gray-50">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Chat Control</h1>
+                <p class="text-gray-500 text-sm mt-1"><%= messages.length %> messages</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="document.getElementById('banModal').classList.remove('hidden')" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">Ban User</button>
+                <button onclick="selectAll()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-xl transition-colors">Select All</button>
+                <button onclick="deleteSelected()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">Delete Selected</button>
+            </div>
+        </div>
+
+        <% if (locals.flash) { %>
+        <div class="mb-5 px-4 py-3 rounded-xl text-sm font-medium <%= flash.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>"><%= flash.message %></div>
+        <% } %>
+
+        <div class="flex gap-6">
+            <!-- Messages -->
+            <div class="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-y-auto max-h-[75vh] p-4 space-y-2">
+                    <% messages.forEach(function(m) { %>
+                    <div class="flex gap-3 <%= m.is_pinned ? 'bg-yellow-50 border border-yellow-200 rounded-xl p-3 -mx-1' : '' %> <%= m.user_id === 0 ? 'opacity-80' : '' %>" id="msg-<%= m.id %>">
+                        <input type="checkbox" class="msg-check mt-2 flex-shrink-0" value="<%= m.id %>">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <% if (m.is_pinned) { %>
+                                <span class="text-yellow-500 text-xs flex-shrink-0" title="Pinned">📌</span>
+                                <% } %>
+                                <% if (m.profile_image) { %>
+                                <img src="<%= m.profile_image %>" class="w-7 h-7 rounded-full object-cover flex-shrink-0">
+                                <% } else { %>
+                                <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                    <%= (m.name || '?').charAt(0).toUpperCase() %>
+                                </div>
+                                <% } %>
+                                <span class="font-semibold text-sm <%= m.user_id === 0 ? 'text-green-600' : 'text-gray-900' %>"><%= m.name %></span>
+                                <% if (m.semester || m.section) { %>
+                                <span class="text-xs text-gray-500">• Y<%= m.semester || '?' %> • Sec <%= m.section || '?' %></span>
+                                <% } %>
+                                <span class="text-xs text-gray-400"><%= new Date(m.created_at).toLocaleString('en-IN') %></span>
+                                <% if (m.parent_id) { %>
+                                <span class="text-xs text-blue-500">↩ reply</span>
+                                <% } %>
+                            </div>
+                            <% if (m.parent_id) { %>
+                            <div class="ml-9 mt-0.5 text-xs text-gray-400 italic border-l-2 border-gray-200 pl-2">Replying to a message</div>
+                            <% } %>
+                            <div class="mt-1">
+                                <% if (m.is_deleted) { %>
+                                <span class="text-gray-400 italic text-sm">message was deleted</span>
+                                <% } else if (m.message_type === 'gif' && m.gif_url) { %>
+                                <img src="<%= m.gif_url %>" class="max-w-[200px] rounded-xl mt-1">
+                                <p class="text-sm text-gray-700 mt-1"><%= m.message %></p>
+                                <% } else if (m.message_type === 'sticker' && m.sticker_url) { %>
+                                <img src="<%= m.sticker_url %>" class="w-24 h-24 object-contain mt-1">
+                                <% } else { %>
+                                <p class="text-sm text-gray-700"><%= m.message %></p>
+                                <% } %>
+                                <% if (Object.keys(m.reactions).length > 0) { %>
+                                <div class="flex flex-wrap gap-1 mt-1.5">
+                                    <% Object.entries(m.reactions).forEach(function([emoji, users]) { %>
+                                    <span class="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-0.5"><%= emoji %> <%= users.length %></span>
+                                    <% }) %>
+                                </div>
+                                <% } %>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-1 flex-shrink-0">
+                            <% if (m.is_pinned) { %>
+                            <form action="/admin/chat/unpin/<%= m.id %>" method="POST">
+                                <button class="text-xs text-yellow-600 hover:text-yellow-800">Unpin</button>
+                            </form>
+                            <% } else if (!m.is_deleted) { %>
+                            <form action="/admin/chat/pin/<%= m.id %>" method="POST">
+                                <button class="text-xs text-gray-500 hover:text-yellow-600">Pin</button>
+                            </form>
+                            <% } %>
+                            <form action="/admin/chat/ban" method="POST" class="inline">
+                                <input type="hidden" name="user_id" value="<%= m.user_id %>">
+                                <input type="hidden" name="reason" value="Inappropriate content">
+                                <button class="text-xs text-amber-600 hover:text-amber-800">Ban</button>
+                            </form>
+                        </div>
+                    </div>
+                    <% }) %>
+                    <% if (messages.length === 0) { %>
+                    <p class="text-center text-gray-400 py-12">No messages yet.</p>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Banned Users Sidebar -->
+            <div class="w-72 flex-shrink-0">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                    <h3 class="font-bold text-gray-900 mb-3">Banned Users</h3>
+                    <% if (bans.length === 0) { %>
+                    <p class="text-sm text-gray-400">No banned users.</p>
+                    <% } %>
+                    <% bans.forEach(function(b) { %>
+                    <div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900"><%= b.user_name || 'User #' + b.user_id %></p>
+                            <p class="text-xs text-gray-400"><%= b.reason %></p>
+                        </div>
+                        <form action="/admin/chat/unban" method="POST">
+                            <input type="hidden" name="user_id" value="<%= b.user_id %>">
+                            <button class="text-xs text-green-600 hover:text-green-800 font-medium">Unban</button>
+                        </form>
+                    </div>
+                    <% }) %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ban Modal -->
+        <div id="banModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Ban User from Chat</h3>
+                <form action="/admin/chat/ban" method="POST">
+                    <div class="mb-4">
+                        <label class="text-sm font-medium text-gray-700 block mb-1.5">User ID</label>
+                        <input type="number" name="user_id" required class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+                    </div>
+                    <div class="mb-5">
+                        <label class="text-sm font-medium text-gray-700 block mb-1.5">Reason</label>
+                        <textarea name="reason" rows="2" required class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/30 resize-none"></textarea>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="button" onclick="document.getElementById('banModal').classList.add('hidden')" class="flex-1 border border-gray-200 text-gray-700 font-medium text-sm py-2.5 rounded-xl hover:bg-gray-50">Cancel</button>
+                        <button type="submit" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm py-2.5 rounded-xl">Ban</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+
+<form id="deleteForm" action="/admin/chat/delete" method="POST"></form>
+
+<script>
+    function selectAll() {
+        document.querySelectorAll('.msg-check').forEach(cb => cb.checked = true);
+    }
+    function deleteSelected() {
+        const checked = document.querySelectorAll('.msg-check:checked');
+        if (checked.length === 0) return alert('Select messages to delete.');
+        if (!confirm('Delete ' + checked.length + ' message(s)?')) return;
+        const form = document.getElementById('deleteForm');
+        form.innerHTML = '';
+        checked.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.submit();
+    }
+</script>
+</body>
+</html>

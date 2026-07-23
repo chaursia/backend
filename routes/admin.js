@@ -1494,4 +1494,95 @@ router.post('/calendar/clear', async (req, res) => {
     }
 });
 
+// ─────────────────────────────────────────────
+//  CHAT CONTROL
+// ─────────────────────────────────────────────
+
+router.get('/chat', async (req, res) => {
+    try {
+        const [messagesRes, bansRes] = await Promise.all([
+            db.execute({ sql: 'SELECT * FROM chat_messages ORDER BY is_pinned DESC, created_at ASC' }),
+            db.execute({ sql: 'SELECT cb.*, u.name as user_name FROM chat_bans cb LEFT JOIN users u ON cb.user_id = u.id ORDER BY cb.created_at DESC' })
+        ]);
+
+        const messages = messagesRes.rows.map(m => ({
+            ...m,
+            mentions: JSON.parse(m.mentions || '[]'),
+            reactions: JSON.parse(m.reactions || '{}'),
+        }));
+
+        res.render('chat', { messages, bans: bansRes.rows, flash: null });
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+router.post('/chat/delete', async (req, res) => {
+    try {
+        const ids = req.body.ids;
+        if (!ids || (Array.isArray(ids) && ids.length === 0)) {
+            return res.status(400).send('No message IDs provided.');
+        }
+        const idList = Array.isArray(ids) ? ids : [ids];
+        await db.execute({
+            sql: `UPDATE chat_messages SET is_deleted = 1, message = NULL, gif_url = NULL, sticker_url = NULL WHERE id IN (${idList.map(() => '?').join(',')})`,
+            args: idList
+        });
+        await logAudit(req.adminUser, 'delete_chat_messages', 'chat', 'bulk', { count: idList.length });
+        res.redirect('/admin/chat?deleted=1');
+    } catch (err) {
+        res.status(500).send('Delete failed: ' + err.message);
+    }
+});
+
+router.post('/chat/ban', async (req, res) => {
+    try {
+        const { user_id, reason } = req.body;
+        if (!user_id || !reason) return res.status(400).send('User ID and reason required.');
+        await db.execute({
+            sql: 'INSERT OR REPLACE INTO chat_bans (user_id, banned_by, reason) VALUES (?, ?, ?)',
+            args: [user_id, req.adminUser?.id, reason]
+        });
+        await logAudit(req.adminUser, 'ban_chat_user', 'chat', user_id, { reason });
+        res.redirect('/admin/chat?banned=1');
+    } catch (err) {
+        res.status(500).send('Ban failed: ' + err.message);
+    }
+});
+
+router.post('/chat/unban', async (req, res) => {
+    try {
+        const { user_id } = req.body;
+        await db.execute({ sql: 'DELETE FROM chat_bans WHERE user_id = ?', args: [user_id] });
+        await logAudit(req.adminUser, 'unban_chat_user', 'chat', user_id);
+        res.redirect('/admin/chat?unbanned=1');
+    } catch (err) {
+        res.status(500).send('Unban failed: ' + err.message);
+    }
+});
+
+router.post('/chat/pin/:id', async (req, res) => {
+    try {
+        await db.execute({
+            sql: 'UPDATE chat_messages SET is_pinned = 1 WHERE id = ?',
+            args: [req.params.id]
+        });
+        res.redirect('/admin/chat');
+    } catch (err) {
+        res.status(500).send('Pin failed: ' + err.message);
+    }
+});
+
+router.post('/chat/unpin/:id', async (req, res) => {
+    try {
+        await db.execute({
+            sql: 'UPDATE chat_messages SET is_pinned = 0 WHERE id = ?',
+            args: [req.params.id]
+        });
+        res.redirect('/admin/chat');
+    } catch (err) {
+        res.status(500).send('Unpin failed: ' + err.message);
+    }
+});
+
 module.exports = router;
