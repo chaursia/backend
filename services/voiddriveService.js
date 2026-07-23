@@ -48,15 +48,35 @@ async function getDownloadUrl(fileId) {
     const apiKey = await getApiKey();
     if (!apiKey || !fileId) return null;
     try {
+        console.log('[VoidDrive] Requesting download-url for fileId=' + fileId.substring(0, 50) + '...');
         const res = await fetch(`${API_BASE}/files/${fileId}/download-url`, {
             headers: { 'X-API-Key': apiKey }
         });
-        const json = await res.json();
-        return json.url || null;
+        const text = await res.text();
+        console.log('[VoidDrive] download-url response status=' + res.status + ' body=' + text);
+        let json;
+        try { json = JSON.parse(text); } catch { json = null; }
+        return json?.url || null;
     } catch (e) {
         console.error('VoidDrive download-url failed:', e.message);
         return null;
     }
 }
 
-module.exports = { getApiKey, getUploadUrl, deleteFile, getDownloadUrl };
+async function getFileInfo(fileId) {
+    const apiKey = await getApiKey();
+    if (!apiKey || !fileId) return null;
+    try {
+        const res = await fetch(`${API_BASE}/files/${fileId}`, {
+            headers: { 'X-API-Key': apiKey }
+        });
+        const text = await res.text();
+        console.log('[VoidDrive] file-info status=' + res.status + ' body=' + text);
+        return { status: res.status, body: text };
+    } catch (e) {
+        console.error('VoidDrive file-info failed:', e.message);
+        return null;
+    }
+}
+
+module.exports = { getApiKey, getUploadUrl, deleteFile, getDownloadUrl, getFileInfo };

@@ -6,7 +6,7 @@ const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
 const { uploadVideo: uploadToByse, deleteVideo: deleteFromByse, getUploadServer: getByseUploadServer, getApiKey: getByseApiKey } = require('../services/byseService');
-const { getUploadUrl: getVoidDriveUploadUrl, deleteFile: deleteVoidDriveFile, getDownloadUrl: getVoidDriveDownloadUrl, getApiKey: getVoidDriveApiKey } = require('../services/voiddriveService');
+const { getUploadUrl: getVoidDriveUploadUrl, deleteFile: deleteVoidDriveFile, getDownloadUrl: getVoidDriveDownloadUrl, getFileInfo: getVoidDriveFileInfo, getApiKey: getVoidDriveApiKey } = require('../services/voiddriveService');
 
 const router = express.Router();
 
