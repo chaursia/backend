@@ -5,8 +5,8 @@ const crypto = require('crypto');
 const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
-const { uploadVideo: uploadToByse, deleteVideo: deleteFromByse, getUploadServer: getByseUploadServer, getApiKey: getByseApiKey } = require('../services/byseService');
-const { getUploadUrl: getVoidDriveUploadUrl, deleteFile: deleteVoidDriveFile, getDownloadUrl: getVoidDriveDownloadUrl, getFileInfo: getVoidDriveFileInfo, getApiKey: getVoidDriveApiKey } = require('../services/voiddriveService');
+const { uploadVideo: uploadToByse, deleteVideo: deleteFromByse } = require('../services/byseService');
+const { uploadFile: uploadToB2, deleteFile: deleteFromB2, getDownloadUrl: getB2DownloadUrl } = require('../services/b2Service');
 
 const router = express.Router();
 
@@ -182,7 +182,7 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
 
         // 1. Verify ownership
         const postRes = await db.execute({
-            sql: "SELECT id, media_url, video_file_id, voiddrive_file_id, user_id FROM social_posts WHERE id = ?",
+            sql: "SELECT id, media_url, video_file_id, b2_file_id, b2_file_name, user_id FROM social_posts WHERE id = ?",
             args: [postId]
         });
 
@@ -217,9 +217,9 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
             }
         }
 
-        // Cleanup VoidDrive documents
-        if (post.voiddrive_file_id) {
-            await deleteVoidDriveFile(post.voiddrive_file_id).catch(err => console.error("VoidDrive Cleanup Failed:", err));
+        // Cleanup B2 documents
+        if (post.b2_file_id && post.b2_file_name) {
+            await deleteFromB2(post.b2_file_id, post.b2_file_name).catch(err => console.error("B2 Cleanup Failed:", err));
         }
 
         // Cleanup Byse.sx video
@@ -249,14 +249,15 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  */
 router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
-        const { content, video_url, video_file_id, video_thumbnail, voiddrive_file_id, voiddrive_file_name } = req.body;
+        const { content, video_url, video_file_id, video_thumbnail } = req.body;
         const files = req.files || [];
-        if (!content && files.length === 0 && !video_url && !voiddrive_file_id) {
+        if (!content && files.length === 0 && !video_url) {
             return res.status(400).json({ error: 'Post must contain text or media.' });
         }
 
         let mediaEntries = [];
-        let voiddriveFileId = null;
+        let b2FileId = null;
+        let b2FileName = null;
 
         if (files.length > 0) {
             for (const file of files) {
@@ -264,30 +265,13 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
                     const uploadResult = await uploadToCloudinary(file.buffer, file.mimetype);
                     mediaEntries.push(`${uploadResult.url}|${uploadResult.public_id}`);
                 } else {
-                    const { uploadUrl, fileId } = await getVoidDriveUploadUrl(file.originalname, file.size, file.mimetype);
-                    const uploadOk = await new Promise((resolve) => {
-                        const putReq = https.request(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.mimetype, 'Content-Length': file.size } }, (putRes) => {
-                            putRes.resume();
-                            resolve(putRes.statusCode >= 200 && putRes.statusCode < 300);
-                        });
-                        putReq.on('error', () => resolve(false));
-                        putReq.write(file.buffer);
-                        putReq.end();
-                    });
-                    if (!uploadOk) throw new Error('VoidDrive PUT upload failed');
-                    const downloadBase = `${req.protocol}://${req.get('host')}/social/download/document`;
-                    mediaEntries.push(`${downloadBase}/${fileId}|${fileId}|${file.originalname}`);
-                    voiddriveFileId = fileId;
+                    const result = await uploadToB2(file.buffer, file.originalname, file.mimetype);
+                    const dlBase = `${req.protocol}://${req.get('host')}/social/download/document`;
+                    mediaEntries.push(`${dlBase}/${result.fileName}|${result.fileId}|${file.originalname}`);
+                    b2FileId = result.fileId;
+                    b2FileName = result.fileName;
                 }
             }
-        }
-
-        // For client-side uploaded documents, use the voiddrive_file_id from body
-        if (!voiddriveFileId && voiddrive_file_id) {
-            voiddriveFileId = voiddrive_file_id;
-            const docName = voiddrive_file_name || 'document';
-            const downloadBase = `${req.protocol}://${req.get('host')}/social/download/document`;
-            mediaEntries.push(`${downloadBase}/${voiddrive_file_id}|${voiddrive_file_id}|${docName}`);
         }
 
         const postId = crypto.randomUUID();
@@ -295,12 +279,11 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         if (video_url) mediaType = 'video';
         else if (mediaEntries.length > 0) {
             const hasImage = files.length > 0 && files.some(f => f.mimetype.startsWith('image/'));
-            const hasDoc = voiddriveFileId != null;
-            mediaType = hasImage && !hasDoc ? 'image' : 'document';
+            mediaType = hasImage ? 'image' : 'document';
         }
 
         await db.execute({
-            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, video_thumbnail, voiddrive_file_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, video_thumbnail, b2_file_id, b2_file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 postId,
                 req.userId,
@@ -310,7 +293,8 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
                 video_url || null,
                 video_file_id || null,
                 video_thumbnail || null,
-                voiddriveFileId
+                b2FileId,
+                b2FileName
             ]
         });
 
@@ -340,22 +324,11 @@ router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
 
 /**
  * GET /social/upload/document/auth
- * Returns VoidDrive signed upload URL for client-side upload.
- * Query params: filename, size, content_type
+ * Unused — documents are now uploaded via multipart through the backend.
+ * Kept for backward compatibility.
  */
 router.get('/upload/document/auth', requireSocialAccess, async (req, res) => {
-    try {
-        const { filename, size, content_type } = req.query;
-        if (!filename || !size || !content_type) {
-            return res.status(400).json({ error: 'filename, size, and content_type are required.' });
-        }
-        const apiKey = await getVoidDriveApiKey();
-        if (!apiKey) return res.status(500).json({ error: 'VoidDrive not configured.' });
-        const { uploadUrl, fileId } = await getVoidDriveUploadUrl(filename, parseInt(size), content_type);
-        res.json({ uploadUrl, fileId });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    res.status(400).json({ error: 'Client-side upload disabled. Use multipart upload instead.' });
 });
 
 /**
@@ -472,16 +445,16 @@ router.post('/post/:id/report', requireSocialAccess, async (req, res) => {
 });
 
 /**
- * GET /social/download/document/:fileId
- * Redirects to a VoidDrive signed download URL.
+ * GET /social/download/document/:fileName
+ * Redirects to a B2 signed download URL.
  */
-router.get('/download/document/:fileId', async (req, res) => {
+router.get('/download/document/:fileName(*)', async (req, res) => {
     try {
-        const url = await getVoidDriveDownloadUrl(req.params.fileId);
+        const url = await getB2DownloadUrl(req.params.fileName);
         if (!url) return res.status(404).json({ error: 'Download URL not available.' });
         res.redirect(url);
     } catch (e) {
-        res.status(500).json({ error: 'Download failed.' });
+        res.status(500).json({ error: 'Download failed: ' + e.message });
     }
 });
 

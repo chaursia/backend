@@ -10,7 +10,6 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 const { getApiKey: getByseApiKey } = require('../services/byseService');
-const { getApiKey: getVoidDriveApiKey } = require('../services/voiddriveService');
 
 // Configure Multer for email attachments
 // NOTE: Use /tmp for Vercel serverless compatibility (read-only filesystem)
@@ -890,10 +889,10 @@ async function checkByse() {
     }
 }
 
-async function checkVoidDrive() {
+async function checkB2() {
     try {
-        const key = await getVoidDriveApiKey();
-        if (!key) return { status: 'unconfigured' };
+        const res = await db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_application_key_id'" });
+        if (!res.rows[0]?.value) return { status: 'unconfigured' };
         return { status: 'configured' };
     } catch (e) {
         return { status: 'error', message: e.message };
@@ -916,7 +915,7 @@ router.get('/health', async (req, res) => {
         checkEndpoint(`${API_BASE}/college/information`),
         checkCloudinary(),
         checkByse(),
-        checkVoidDrive(),
+        checkB2(),
     ]);
 
     const get = (i, def) => results[i]?.status === 'fulfilled' ? results[i].value : def;
@@ -941,7 +940,7 @@ router.get('/health', async (req, res) => {
             collegeInfo: get(8, { status: 'unreachable', code: null }),
             cloudinary: get(9, { status: 'unreachable', code: null }),
             byse: get(10, { status: 'unreachable' }),
-            voiddrive: get(11, { status: 'unreachable' }),
+            b2: get(11, { status: 'unreachable' }),
         }
     });
 });
@@ -1006,7 +1005,8 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
         let mediaUrl = null;
         let mediaType = null;
         let publicId = null;
-        let voiddriveFileId = null;
+        let b2FileId = null;
+        let b2FileName = null;
         let videoUrl = null;
         let videoFileId = null;
 
@@ -1018,23 +1018,13 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
                 mediaType = 'image';
                 publicId = uploadResult.public_id;
             } else {
-                const { getUploadUrl: getVoidDriveUploadUrl } = require('../services/voiddriveService');
-                const { uploadUrl, fileId } = await getVoidDriveUploadUrl(file.originalname, file.size, file.mimetype);
-                const https = require('https');
-                const uploadOk = await new Promise((resolve) => {
-                    const putReq = https.request(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.mimetype, 'Content-Length': file.size } }, (putRes) => {
-                        putRes.resume();
-                        resolve(putRes.statusCode >= 200 && putRes.statusCode < 300);
-                    });
-                    putReq.on('error', () => resolve(false));
-                    putReq.write(file.buffer);
-                    putReq.end();
-                });
-                if (!uploadOk) throw new Error('VoidDrive PUT upload failed');
-                const downloadBase = `${req.protocol}://${req.get('host')}/social/download/document`;
-                mediaUrl = `${downloadBase}/${fileId}|${fileId}|${file.originalname}`;
+                const { uploadFile: uploadToB2 } = require('../services/b2Service');
+                const result = await uploadToB2(file.buffer, file.originalname, file.mimetype);
+                const dlBase = `${req.protocol}://${req.get('host')}/social/download/document`;
+                mediaUrl = `${dlBase}/${result.fileName}|${result.fileId}|${file.originalname}`;
                 mediaType = 'document';
-                voiddriveFileId = fileId;
+                b2FileId = result.fileId;
+                b2FileName = result.fileName;
             }
         }
 
@@ -1048,8 +1038,8 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
 
         const postId = crypto.randomUUID();
         await db.execute({
-            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, voiddrive_file_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [postId, adminUserId, content || '', mediaUrl, mediaType, videoUrl, videoFileId, voiddriveFileId]
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, b2_file_id, b2_file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [postId, adminUserId, content || '', mediaUrl, mediaType, videoUrl, videoFileId, b2FileId, b2FileName]
         });
 
         await logAudit(req.adminUser, 'admin_social_post', 'post', postId, { content: (content || '').substring(0, 50) });
@@ -1104,9 +1094,8 @@ router.get('/social', async (req, res) => {
 router.post('/social/post/:id/delete', async (req, res) => {
     try {
         const { deleteFromCloudinary } = require('../services/cloudinaryService');
-        const { deleteFile: deleteVoidDriveFile } = require('../services/voiddriveService');
         const { deleteVideo } = require('../services/byseService');
-        const postRes = await db.execute({ sql: `SELECT media_url, media_type, video_file_id, voiddrive_file_id FROM social_posts WHERE id = ?`, args: [req.params.id]});
+        const postRes = await db.execute({ sql: `SELECT media_url, media_type, video_file_id, b2_file_id, b2_file_name FROM social_posts WHERE id = ?`, args: [req.params.id]});
         
         if (postRes.rows.length > 0) {
             const post = postRes.rows[0];
@@ -1116,8 +1105,8 @@ router.post('/social/post/:id/delete', async (req, res) => {
                     await deleteFromCloudinary(parts[1]).catch(() => {});
                 }
             }
-            if (post.voiddrive_file_id) {
-                await deleteVoidDriveFile(post.voiddrive_file_id);
+            if (post.b2_file_id && post.b2_file_name) {
+                await deleteFromB2(post.b2_file_id, post.b2_file_name);
             }
             if (post.video_file_id) {
                 await deleteVideo(post.video_file_id);
@@ -1200,13 +1189,19 @@ router.post('/app-settings', async (req, res) => {
 
 router.get('/media-settings', async (req, res) => {
     try {
-        const [byseRes, voiddriveRes] = await Promise.all([
+        const [byseRes, b2IdRes, b2KeyRes, b2BucketRes, b2NameRes] = await Promise.all([
             db.execute({ sql: "SELECT value FROM app_config WHERE key = 'byse_api_key'" }),
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'voiddrive_api_key'" })
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_application_key_id'" }),
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_application_key'" }),
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_bucket_id'" }),
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_bucket_name'" })
         ]);
         res.render('media-settings', {
             byseApiKey: byseRes.rows[0]?.value || '',
-            voiddriveApiKey: voiddriveRes.rows[0]?.value || '',
+            b2ApplicationKeyId: b2IdRes.rows[0]?.value || '',
+            b2ApplicationKey: b2KeyRes.rows[0]?.value || '',
+            b2BucketId: b2BucketRes.rows[0]?.value || '',
+            b2BucketName: b2NameRes.rows[0]?.value || '',
             flash: null
         });
     } catch (err) {
@@ -1231,34 +1226,31 @@ router.post('/media-settings', async (req, res) => {
     }
 });
 
-router.post('/media-settings/voiddrive', async (req, res) => {
+router.post('/media-settings/b2', async (req, res) => {
     try {
-        const { voiddrive_api_key } = req.body;
-        if (voiddrive_api_key) {
-            await db.execute({
-                sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-                args: ['voiddrive_api_key', voiddrive_api_key]
-            });
+        const { b2_application_key_id, b2_application_key, b2_bucket_id, b2_bucket_name } = req.body;
+        const updates = [
+            ['b2_application_key_id', b2_application_key_id],
+            ['b2_application_key', b2_application_key],
+            ['b2_bucket_id', b2_bucket_id],
+            ['b2_bucket_name', b2_bucket_name]
+        ];
+        for (const [key, value] of updates) {
+            if (value) {
+                await db.execute({
+                    sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                    args: [key, value]
+                });
+            }
         }
-
-        await logAudit(req.adminUser, 'update_media_settings', 'system', 'voiddrive');
+        await logAudit(req.adminUser, 'update_media_settings', 'system', 'b2');
         res.redirect('/admin/media-settings?saved=1');
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
     }
 });
 
-// ─────────────────────────────────────────────
-//  VOIDDRIVE DEBUG
-// ─────────────────────────────────────────────
-router.get('/debug/voiddrive-file', async (req, res) => {
-    const { getFileInfo, getDownloadUrl } = require('../services/voiddriveService');
-    const fileId = req.query.id;
-    if (!fileId) return res.status(400).json({ error: 'Provide ?id=fileId' });
-    const info = await getFileInfo(fileId);
-    const dl = await getDownloadUrl(fileId);
-    res.json({ fileId: fileId.substring(0, 50) + '...', info, downloadUrl: dl });
-});
+
 
 // ─────────────────────────────────────────────
 //  FACULTY MANAGEMENT
