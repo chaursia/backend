@@ -248,24 +248,28 @@ router.get('/upload/voice/auth', async (req, res) => {
     }
 });
 
-// GET /api/chat/voice/*fileName — proxy voice audio from B2 (no redirect for reliable MediaPlayer playback)
+// GET /api/chat/voice/url/*fileName — return signed B2 download URL (client downloads directly from B2)
+router.get('/voice/url/*fileName', async (req, res) => {
+    try {
+        const fileName = req.params[0];
+        console.log('[voice/url] Requested:', fileName);
+        const downloadUrl = await getB2DownloadUrl(fileName);
+        console.log('[voice/url] Returning signed URL');
+        res.json({ url: downloadUrl, fileName: fileName });
+    } catch (e) {
+        console.error('[voice/url] Error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/chat/voice/*fileName — (legacy redirect, fallback)
 router.get('/voice/*fileName', async (req, res) => {
     try {
         const fileName = req.params[0];
         console.log('[voice] Requested:', fileName);
         const downloadUrl = await getB2DownloadUrl(fileName);
-        console.log('[voice] B2 download URL:', downloadUrl?.substring(0, 80));
-        const response = await fetch(downloadUrl, { signal: AbortSignal.timeout(15000) });
-        if (!response.ok) {
-            const errBody = await response.text().catch(() => '');
-            console.error('[voice] B2 fetch failed:', response.status, errBody?.substring(0, 200));
-            return res.status(response.status).json({ error: 'B2 fetch failed: ' + errBody?.substring(0, 200) });
-        }
-        const contentType = response.headers.get('content-type') || 'audio/3gpp';
-        console.log('[voice] B2 response OK, content-type:', contentType, 'size:', response.headers.get('content-length'));
-        res.set('Content-Type', contentType);
-        const arrayBuffer = await response.arrayBuffer();
-        res.send(Buffer.from(arrayBuffer));
+        console.log('[voice] Redirecting to B2');
+        res.redirect(downloadUrl);
     } catch (e) {
         console.error('[voice] Error:', e.message);
         res.status(500).json({ error: e.message });
