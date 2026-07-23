@@ -248,7 +248,7 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  */
 router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
-        const { content, video_url, video_file_id, video_thumbnail, filelu_file_id } = req.body;
+        const { content, video_url, video_file_id, video_thumbnail, filelu_file_id, filelu_file_name } = req.body;
         const files = req.files || [];
         if (!content && files.length === 0 && !video_url && !filelu_file_id) {
             return res.status(400).json({ error: 'Post must contain text or media.' });
@@ -273,7 +273,8 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         // For client-side uploaded documents, use the filelu_file_id from body
         if (!fileluFileId && filelu_file_id) {
             fileluFileId = filelu_file_id;
-            mediaEntries.push(`https://filelu.com/${filelu_file_id}|${filelu_file_id}`);
+            const docName = filelu_file_name || 'document';
+            mediaEntries.push(`https://filelu.com/${filelu_file_id}|${filelu_file_id}|${docName}`);
         }
 
         const postId = crypto.randomUUID();
