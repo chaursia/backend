@@ -248,11 +248,19 @@ router.get('/upload/voice/auth', async (req, res) => {
     }
 });
 
-// GET /api/chat/voice/*fileName — stream voice audio from B2
+// GET /api/chat/voice/*fileName — proxy voice audio from B2 (no redirect for reliable MediaPlayer playback)
 router.get('/voice/*fileName', async (req, res) => {
     try {
         const downloadUrl = await getB2DownloadUrl(req.params[0]);
-        res.redirect(downloadUrl);
+        const response = await fetch(downloadUrl);
+        if (!response.ok) {
+            const errBody = await response.text().catch(() => '');
+            return res.status(response.status).json({ error: 'Failed to fetch audio from storage: ' + errBody });
+        }
+        const contentType = response.headers.get('content-type') || 'audio/3gpp';
+        res.set('Content-Type', contentType);
+        const arrayBuffer = await response.arrayBuffer();
+        res.send(Buffer.from(arrayBuffer));
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
