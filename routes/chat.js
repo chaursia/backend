@@ -24,7 +24,7 @@ router.use(async (req, res, next) => {
         }
 
         const userRes = await db.execute({
-            sql: 'SELECT id, name, roll_no, profile_image, college_id, semester, section FROM users WHERE id = ?',
+            sql: 'SELECT id, name, roll_no, profile_image, college_id, semester, section, verify_badge FROM users WHERE id = ?',
             args: [session.user_id]
         });
 
@@ -101,12 +101,12 @@ router.post('/messages', async (req, res) => {
         }
 
         const result = await db.execute({
-            sql: `INSERT INTO chat_messages (user_id, name, roll_no, profile_image, semester, section, message, parent_id, mentions, message_type, gif_url, sticker_url)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO chat_messages (user_id, name, roll_no, profile_image, semester, section, verify_badge, message, parent_id, mentions, message_type, gif_url, sticker_url)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 req.user.id, req.user.first_name, req.user.roll_no || null,
                 req.user.profile_image || null, req.user.semester || null,
-                req.user.section || null, message || null,
+                req.user.section || null, req.user.verify_badge ? 1 : 0, message || null,
                 parent_id || null, JSON.stringify(mentions || []),
                 message_type || 'text', gif_url || null, sticker_url || null
             ]

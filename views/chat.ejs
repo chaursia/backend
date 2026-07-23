@@ -38,6 +38,7 @@
                                 </div>
                                 <% } %>
                                 <span class="font-semibold text-sm <%= m.user_id === 0 ? 'text-green-600' : 'text-gray-900' %>"><%= m.name %></span>
+                                <% if (m.verify_badge) { %><span class="text-blue-500 text-xs flex-shrink-0" title="Verified">✓</span><% } %>
                                 <% if (m.semester || m.section) { %>
                                 <span class="text-xs text-gray-500">• Y<%= m.semester || '?' %> • Sec <%= m.section || '?' %></span>
                                 <% } %>

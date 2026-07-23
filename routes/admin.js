@@ -1590,12 +1590,10 @@ router.post('/chat/send', async (req, res) => {
         const { message, parent_id } = req.body;
         if (!message || !message.trim()) return res.status(400).send('Message is required.');
 
-        const adminName = req.adminUser?.email ? req.adminUser.email.split('@')[0] : 'Admin';
-
         await db.execute({
-            sql: `INSERT INTO chat_messages (user_id, name, message, parent_id, message_type)
-                  VALUES (-1, ?, ?, ?, 'text')`,
-            args: [adminName, message.trim(), parent_id || null]
+            sql: `INSERT INTO chat_messages (user_id, name, message, parent_id, message_type, verify_badge)
+                  VALUES (-1, 'Moderator', ?, ?, 'text', 1)`,
+            args: [message.trim(), parent_id || null]
         });
 
         res.redirect('/admin/chat');

@@ -70,7 +70,9 @@ async function initDb() {
       "ALTER TABLE faculty ADD COLUMN profile_image TEXT",
       "ALTER TABLE chat_messages ADD COLUMN is_pinned INTEGER DEFAULT 0",
       "ALTER TABLE chat_messages ADD COLUMN semester INTEGER",
-      "ALTER TABLE chat_messages ADD COLUMN section TEXT"
+      "ALTER TABLE chat_messages ADD COLUMN section TEXT",
+      "ALTER TABLE chat_messages ADD COLUMN verify_badge INTEGER DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN verify_badge INTEGER DEFAULT 0"
     ];
 
     for (const sql of columns) {
