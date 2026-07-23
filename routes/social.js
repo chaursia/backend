@@ -74,6 +74,10 @@ const requireSocialAccess = async (req, res, next) => {
  */
 router.get('/feed', requireSocialAccess, async (req, res) => {
     try {
+        // Ensure new columns exist
+        await db.execute({ sql: "ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT", args: [] }).catch(() => {});
+        await db.execute({ sql: "ALTER TABLE social_posts ADD COLUMN video_file_id TEXT", args: [] }).catch(() => {});
+
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const offset = (page - 1) * limit;
@@ -116,6 +120,8 @@ router.get('/feed', requireSocialAccess, async (req, res) => {
  */
 router.get('/user/posts', requireSocialAccess, async (req, res) => {
     try {
+        await db.execute({ sql: "ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT", args: [] }).catch(() => {});
+
         const userPostsSql = `
             SELECT 
                 p.id, p.content, p.media_url, p.media_type, p.video_url, p.video_file_id, p.video_thumbnail, p.created_at, p.is_repost,
@@ -219,6 +225,8 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  */
 router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
+        await db.execute({ sql: "ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT", args: [] }).catch(() => {});
+
         const { content, video_url, video_file_id, video_thumbnail } = req.body;
         const files = req.files || [];
         if (!content && files.length === 0 && !video_url) {
@@ -238,13 +246,6 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         let mediaType = null;
         if (video_url) mediaType = 'video';
         else if (mediaEntries.length > 0) mediaType = 'image';
-
-        try {
-            await db.execute({
-                sql: `ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT`,
-                args: []
-            });
-        } catch (_) {}
 
         await db.execute({
             sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, video_thumbnail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
