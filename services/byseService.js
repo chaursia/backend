@@ -47,4 +47,16 @@ async function deleteVideo(fileCode) {
     }
 }
 
-module.exports = { getApiKey, getUploadServer, uploadVideo, deleteVideo };
+async function getThumbnail(fileCode) {
+    const apiKey = await getApiKey();
+    if (!apiKey) return null;
+    try {
+        const res = await fetch(`${BYSE_API_BASE}/images/thumb?key=${apiKey}&file_code=${fileCode}`);
+        const json = await res.json();
+        return json.result?.thumbnail || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+module.exports = { getApiKey, getUploadServer, uploadVideo, deleteVideo, getThumbnail };

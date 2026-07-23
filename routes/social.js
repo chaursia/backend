@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
-const { getApiKey, getUploadServer, uploadVideo: uploadToByse, deleteVideo: deleteFromByse } = require('../services/byseService');
+const { getApiKey, getUploadServer, getThumbnail, uploadVideo: uploadToByse, deleteVideo: deleteFromByse } = require('../services/byseService');
 const { uploadFile: uploadToB2, deleteFile: deleteFromB2, getDownloadUrl: getB2DownloadUrl, getUploadAuth: getB2UploadAuth } = require('../services/b2Service');
 
 const router = express.Router();
@@ -326,6 +326,22 @@ router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
 
         const uploadServer = await getUploadServer();
         res.json({ uploadServer, apiKey });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * GET /social/video/thumbnail
+ * Returns the thumbnail URL for a Byse video filecode.
+ */
+router.get('/video/thumbnail', requireSocialAccess, async (req, res) => {
+    try {
+        const { filecode } = req.query;
+        if (!filecode) return res.status(400).json({ error: 'Missing filecode parameter.' });
+        const thumbnail = await getThumbnail(filecode);
+        if (!thumbnail) return res.status(404).json({ error: 'Thumbnail not available.' });
+        res.json({ thumbnail });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
