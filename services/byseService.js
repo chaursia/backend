@@ -14,7 +14,7 @@ async function getUploadServer() {
     if (!apiKey) throw new Error('Byse not configured.');
     const res = await fetch(`${BYSE_API_BASE}/upload/server?key=${apiKey}`);
     const json = await res.json();
-    return json.server;
+    return json.result;
 }
 
 async function uploadVideo(buffer, fileName, mimeType) {
