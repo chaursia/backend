@@ -103,7 +103,16 @@ router.get('/feed', requireSocialAccess, async (req, res) => {
             args: [req.userId, limit, offset]
         });
 
-        res.json(feedData.rows);
+        // Fill in fallback thumbnail for existing posts that don't have one stored
+        const rows = feedData.rows.map(row => {
+            if (!row.video_thumbnail && row.video_url && row.video_url.includes('ik.imagekit.io')) {
+                const url = new URL(row.video_url);
+                row.video_thumbnail = `${url.origin}/tr:n-media_library_thumbnail${url.pathname}`;
+            }
+            return row;
+        });
+
+        res.json(rows);
     } catch (e) {
         console.error("Feed Error:", e);
         res.status(500).json({ error: 'Internal server error fetching feed.' });
@@ -140,7 +149,15 @@ router.get('/user/posts', requireSocialAccess, async (req, res) => {
             args: [req.userId, req.userId]
         });
 
-        res.json(postsData.rows);
+        const rows = postsData.rows.map(row => {
+            if (!row.video_thumbnail && row.video_url && row.video_url.includes('ik.imagekit.io')) {
+                const url = new URL(row.video_url);
+                row.video_thumbnail = `${url.origin}/tr:n-media_library_thumbnail${url.pathname}`;
+            }
+            return row;
+        });
+
+        res.json(rows);
     } catch (e) {
         console.error("User Posts Error:", e);
         res.status(500).json({ error: 'Failed to fetch your post history.' });
