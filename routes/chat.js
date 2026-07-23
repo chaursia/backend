@@ -186,13 +186,18 @@ router.post('/messages/:id/react', async (req, res) => {
         const reactions = JSON.parse(msgRes.rows[0].reactions || '{}');
         const userId = String(req.user.id);
 
-        if (reactions[emoji] && reactions[emoji].includes(userId)) {
-            reactions[emoji] = reactions[emoji].filter(id => id !== userId);
-            if (reactions[emoji].length === 0) delete reactions[emoji];
-        } else {
-            if (!reactions[emoji]) reactions[emoji] = [];
+        // Remove user from any existing reaction
+        for (const key of Object.keys(reactions)) {
+            reactions[key] = reactions[key].filter(id => id !== userId);
+            if (reactions[key].length === 0) delete reactions[key];
+        }
+
+        // If user clicked a different emoji than their previous one, add it
+        if (!reactions[emoji]) reactions[emoji] = [];
+        if (!reactions[emoji].includes(userId)) {
             reactions[emoji].push(userId);
         }
+        // If the same emoji was clicked again, it was already removed above (toggle off)
 
         await db.execute({
             sql: 'UPDATE chat_messages SET reactions = ? WHERE id = ?',
@@ -217,26 +222,14 @@ router.get('/users', async (req, res) => {
     } catch (error) { handleError(res, error); }
 });
 
-// GET /api/chat/greeting — check if user needs bot welcome
+// GET /api/chat/greeting — check if bot already greeted this user
 router.get('/greeting', async (req, res) => {
     try {
         const msgRes = await db.execute({
             sql: "SELECT id FROM chat_messages WHERE user_id = ? AND message_type = 'bot_greeting'",
             args: [req.user.id]
         });
-
-        if (msgRes.rows.length > 0) {
-            return res.json({ needsGreeting: false });
-        }
-
-        const greeting = `Welcome to the chat, ${req.user.first_name}! Say hello to everyone. 👋`;
-        await db.execute({
-            sql: `INSERT INTO chat_messages (user_id, name, message, message_type)
-                  VALUES (0, 'BOT', ?, 'bot_greeting')`,
-            args: [greeting]
-        });
-
-        res.json({ needsGreeting: true });
+        res.json({ needsGreeting: msgRes.rows.length === 0 });
     } catch (error) { handleError(res, error); }
 });
 

@@ -60,13 +60,20 @@ async function loginAndSync(email, password) {
             // Trigger Welcome Email (Async - don't block login)
             sendWelcomeEmail(userData).catch(e => console.error('Welcome Mail Error:', e));
 
-            // Send bot greeting in chat
-            const firstName = (userData.name || '').split(' ')[0] || userData.name;
-            db.execute({
-                sql: `INSERT INTO chat_messages (user_id, name, message, message_type)
-                      VALUES (0, 'BOT', ?, 'bot_greeting')`,
-                args: [`Welcome to the chat, ${firstName}! Say hello to everyone. 👋`]
-            }).catch(() => {});
+            // Send bot greeting in chat (user_id = the new user to mark greeted)
+            const idRes = await db.execute({
+                sql: 'SELECT id FROM users WHERE college_id = ?',
+                args: [userData.college_id]
+            });
+            const newUserId = idRes.rows[0]?.id;
+            if (newUserId) {
+                const firstName = (userData.name || '').split(' ')[0] || userData.name;
+                db.execute({
+                    sql: `INSERT INTO chat_messages (user_id, name, message, message_type)
+                          VALUES (?, 'BOT', ?, 'bot_greeting')`,
+                    args: [newUserId, `Welcome to the chat, ${firstName}! Say hello to everyone. 👋`]
+                }).catch(() => {});
+            }
         } else {
             console.log(`🔄 UPDATING existing user: ${userData.name}`);
             await db.execute({
