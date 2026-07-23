@@ -275,8 +275,8 @@ router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
         if (!publicKey) return res.status(500).json({ error: 'ImageKit not configured.' });
 
         const ik = await getImageKit();
-        if (!ik) return res.status(500).json({ error: 'ImageKit not configured.' });
-        const auth = ik.getAuthenticationParameters();
+        if (!ik || !ik.helper) return res.status(500).json({ error: 'ImageKit not configured.' });
+        const auth = ik.helper.getAuthenticationParameters();
         res.json({
             token: auth.token,
             signature: auth.signature,
