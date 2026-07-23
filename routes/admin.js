@@ -1585,4 +1585,23 @@ router.post('/chat/unpin/:id', async (req, res) => {
     }
 });
 
+router.post('/chat/send', async (req, res) => {
+    try {
+        const { message, parent_id } = req.body;
+        if (!message || !message.trim()) return res.status(400).send('Message is required.');
+
+        const adminName = req.adminUser?.email ? req.adminUser.email.split('@')[0] : 'Admin';
+
+        await db.execute({
+            sql: `INSERT INTO chat_messages (user_id, name, message, parent_id, message_type)
+                  VALUES (-1, ?, ?, ?, 'text')`,
+            args: [adminName, message.trim(), parent_id || null]
+        });
+
+        res.redirect('/admin/chat');
+    } catch (err) {
+        res.status(500).send('Send failed: ' + err.message);
+    }
+});
+
 module.exports = router;
