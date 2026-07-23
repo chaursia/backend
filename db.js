@@ -77,7 +77,8 @@ async function initDb() {
       "ALTER TABLE social_posts ADD COLUMN video_file_id TEXT",
       "ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT",
       "ALTER TABLE social_posts ADD COLUMN b2_file_id TEXT",
-      "ALTER TABLE social_posts ADD COLUMN b2_file_name TEXT"
+      "ALTER TABLE social_posts ADD COLUMN b2_file_name TEXT",
+      "ALTER TABLE chat_messages ADD COLUMN voice_url TEXT"
     ];
 
     for (const sql of columns) {

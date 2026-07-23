@@ -1,6 +1,7 @@
 const express = require('express');
 const { db } = require('../db');
 const sessionStore = require('../utils/sessionStore');
+const { getUploadAuth: getB2UploadAuth, getDownloadUrl: getB2DownloadUrl } = require('../services/b2Service');
 
 const router = express.Router();
 
@@ -88,9 +89,9 @@ router.get('/messages', async (req, res) => {
 // POST /api/chat/messages — send message
 router.post('/messages', async (req, res) => {
     try {
-        const { message, parent_id, mentions, message_type, gif_url, sticker_url } = req.body;
+        const { message, parent_id, mentions, message_type, gif_url, sticker_url, voice_url } = req.body;
 
-        if (!message && message_type !== 'gif' && message_type !== 'sticker') {
+        if (!message && message_type !== 'gif' && message_type !== 'sticker' && message_type !== 'voice') {
             return res.status(400).json({ error: 'Message text is required.' });
         }
         if (message_type === 'gif' && !gif_url) {
@@ -99,16 +100,19 @@ router.post('/messages', async (req, res) => {
         if (message_type === 'sticker' && !sticker_url) {
             return res.status(400).json({ error: 'Sticker URL is required.' });
         }
+        if (message_type === 'voice' && !voice_url) {
+            return res.status(400).json({ error: 'Voice URL is required.' });
+        }
 
         const result = await db.execute({
-            sql: `INSERT INTO chat_messages (user_id, name, roll_no, profile_image, semester, section, verify_badge, message, parent_id, mentions, message_type, gif_url, sticker_url)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO chat_messages (user_id, name, roll_no, profile_image, semester, section, verify_badge, message, parent_id, mentions, message_type, gif_url, sticker_url, voice_url)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 req.user.id, req.user.first_name, req.user.roll_no || null,
                 req.user.profile_image || null, req.user.semester || null,
                 req.user.section || null, req.user.verify_badge ? 1 : 0, message || null,
                 parent_id || null, JSON.stringify(mentions || []),
-                message_type || 'text', gif_url || null, sticker_url || null
+                message_type || 'text', gif_url || null, sticker_url || null, voice_url || null
             ]
         });
 
@@ -231,6 +235,27 @@ router.get('/greeting', async (req, res) => {
         });
         res.json({ needsGreeting: msgRes.rows.length === 0 });
     } catch (error) { handleError(res, error); }
+});
+
+// GET /api/chat/upload/voice/auth — B2 upload credentials for voice messages
+router.get('/upload/voice/auth', async (req, res) => {
+    try {
+        const auth = await getB2UploadAuth();
+        if (!auth) return res.status(500).json({ error: 'B2 not configured.' });
+        res.json(auth);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/chat/voice/*fileName — stream voice audio from B2
+router.get('/voice/*fileName', async (req, res) => {
+    try {
+        const downloadUrl = await getB2DownloadUrl(req.params[0]);
+        res.redirect(downloadUrl);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 module.exports = router;
