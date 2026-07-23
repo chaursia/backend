@@ -4,14 +4,14 @@ const crypto = require('crypto');
 const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
-const { uploadVideo: uploadToImageKit, deleteVideo: deleteFromImageKit } = require('../services/imagekitService');
+const { uploadVideo: uploadToImageKit, deleteVideo: deleteFromImageKit, getImageKit } = require('../services/imagekitService');
 
 const router = express.Router();
 
 // Multer memory storage
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for posts (videos, images, pdfs)
+    limits: { fileSize: 200 * 1024 * 1024 }, // 200MB limit for posts (videos, images, pdfs)
 });
 
 /**
@@ -260,17 +260,22 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
 });
 
 /**
- * POST /social/upload/video
- * Upload a video to ImageKit and return URL/fileId.
+ * GET /social/upload/video/auth
+ * Returns ImageKit authentication parameters for client-side upload.
+ * The app uploads directly to ImageKit to bypass Vercel's 4.5MB body limit.
  */
-router.post('/upload/video', requireSocialAccess, upload.single('video'), async (req, res) => {
+router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
     try {
-        if (!req.file) return res.status(400).json({ error: 'No video file provided.' });
-        if (!req.file.mimetype.startsWith('video/')) {
-            return res.status(400).json({ error: 'File must be a video.' });
-        }
-        const result = await uploadToImageKit(req.file.buffer, req.file.originalname, req.file.mimetype);
-        res.json({ url: result.url, fileId: result.fileId, thumbnail: result.thumbnail });
+        const ik = await getImageKit();
+        if (!ik) return res.status(500).json({ error: 'ImageKit not configured.' });
+        const auth = ik.getAuthenticationParameters();
+        res.json({
+            token: auth.token,
+            signature: auth.signature,
+            expire: auth.expire,
+            publicKey: ik.options.publicKey,
+            urlEndpoint: ik.options.urlEndpoint
+        });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
