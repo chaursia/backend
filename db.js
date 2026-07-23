@@ -149,7 +149,22 @@ async function initDb() {
       );
     `);
 
-    // 7. Chat Bans Table
+    // 7. Library Documents Table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS library_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        user_name TEXT NOT NULL,
+        caption TEXT NOT NULL,
+        b2_file_name TEXT NOT NULL,
+        b2_file_id TEXT,
+        mime_type TEXT DEFAULT 'application/octet-stream',
+        file_size INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 8. Chat Bans Table
     await db.execute(`
       CREATE TABLE IF NOT EXISTS chat_bans (
         user_id INTEGER PRIMARY KEY,

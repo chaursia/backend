@@ -73,6 +73,9 @@ app.use('/social', require('./routes/social'));
 // Chat System
 app.use('/api/chat', require('./routes/chat'));
 
+// Library / Document Upload System
+app.use('/api/library', require('./routes/library'));
+
 // Admin Dashboard UI (Server-Side Rendered)
 app.use('/admin', adminRoutes);
 
