@@ -107,7 +107,10 @@ router.get('/feed', requireSocialAccess, async (req, res) => {
         const rows = feedData.rows.map(row => {
             if (!row.video_thumbnail && row.video_url && row.video_url.includes('ik.imagekit.io')) {
                 const url = new URL(row.video_url);
-                row.video_thumbnail = `${url.origin}/tr:n-media_library_thumbnail${url.pathname}`;
+                const parts = url.pathname.split('/');
+                const endpoint = parts[1];
+                const filePath = parts.slice(2).join('/');
+                row.video_thumbnail = `${url.origin}/${endpoint}/tr:n-media_library_thumbnail/${filePath}`;
             }
             return row;
         });
@@ -152,7 +155,10 @@ router.get('/user/posts', requireSocialAccess, async (req, res) => {
         const rows = postsData.rows.map(row => {
             if (!row.video_thumbnail && row.video_url && row.video_url.includes('ik.imagekit.io')) {
                 const url = new URL(row.video_url);
-                row.video_thumbnail = `${url.origin}/tr:n-media_library_thumbnail${url.pathname}`;
+                const parts = url.pathname.split('/');
+                const endpoint = parts[1];
+                const filePath = parts.slice(2).join('/');
+                row.video_thumbnail = `${url.origin}/${endpoint}/tr:n-media_library_thumbnail/${filePath}`;
             }
             return row;
         });
