@@ -175,7 +175,7 @@ router.get('/class', async (req, res) => {
         }
 
         const userRes = await db.execute({
-            sql: 'SELECT section FROM users WHERE id = ?',
+            sql: 'SELECT section, semester FROM users WHERE id = ?',
             args: [session.user_id]
         });
 
@@ -183,18 +183,19 @@ router.get('/class', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const section = userRes.rows[0].section;
+        const { section, semester } = userRes.rows[0];
         if (!section) {
             return res.status(400).json({ error: 'No section assigned to your account' });
         }
 
         const students = await db.execute({
-            sql: 'SELECT name, roll_no, profile_image, phone FROM users WHERE section = ? ORDER BY roll_no ASC',
-            args: [section]
+            sql: 'SELECT name, roll_no, profile_image, phone FROM users WHERE section = ? AND semester = ? ORDER BY roll_no ASC',
+            args: [section, semester]
         });
 
         res.json({
             section,
+            semester,
             total: students.rows.length,
             students: students.rows
         });
