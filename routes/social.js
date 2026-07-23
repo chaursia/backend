@@ -266,6 +266,14 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
  */
 router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
     try {
+        const [pubRes, urlRes] = await Promise.all([
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_public_key'" }),
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_url_endpoint'" })
+        ]);
+        const publicKey = pubRes.rows[0]?.value;
+        const urlEndpoint = urlRes.rows[0]?.value;
+        if (!publicKey) return res.status(500).json({ error: 'ImageKit not configured.' });
+
         const ik = await getImageKit();
         if (!ik) return res.status(500).json({ error: 'ImageKit not configured.' });
         const auth = ik.getAuthenticationParameters();
@@ -273,8 +281,8 @@ router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
             token: auth.token,
             signature: auth.signature,
             expire: auth.expire,
-            publicKey: ik.options.publicKey,
-            urlEndpoint: ik.options.urlEndpoint
+            publicKey,
+            urlEndpoint: urlEndpoint || ''
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
