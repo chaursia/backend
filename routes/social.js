@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
-const { uploadVideo: uploadToImageKit, deleteVideo: deleteFromImageKit, getImageKit } = require('../services/imagekitService');
+const { uploadVideo: uploadToByse, deleteVideo: deleteFromByse, getUploadServer, getApiKey } = require('../services/byseService');
 
 const router = express.Router();
 
@@ -103,7 +103,7 @@ router.get('/feed', requireSocialAccess, async (req, res) => {
             args: [req.userId, limit, offset]
         });
 
-        // Fill in fallback thumbnail for existing posts that don't have one stored
+        // Fill in fallback thumbnail for legacy ImageKit posts
         const rows = feedData.rows.map(row => {
             if (!row.video_thumbnail && row.video_url && row.video_url.includes('ik.imagekit.io')) {
                 const url = new URL(row.video_url);
@@ -215,9 +215,9 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
             }
         }
 
-        // Cleanup ImageKit video
+        // Cleanup Byse.sx video
         if (post.video_file_id) {
-            await deleteFromImageKit(post.video_file_id).catch(err => console.error("ImageKit Cleanup Failed:", err));
+            await deleteFromByse(post.video_file_id).catch(err => console.error("Byse Cleanup Failed:", err));
         }
 
         // 3. Delete from Turso (Likes and comments will be orphaned or CASCADE if set, 
@@ -285,29 +285,16 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
 
 /**
  * GET /social/upload/video/auth
- * Returns ImageKit authentication parameters for client-side upload.
- * The app uploads directly to ImageKit to bypass Vercel's 4.5MB body limit.
+ * Returns Byse.sx upload server URL and API key for client-side upload.
+ * The app uploads directly to Byse to bypass Vercel's 4.5MB body limit.
  */
 router.get('/upload/video/auth', requireSocialAccess, async (req, res) => {
     try {
-        const [pubRes, urlRes] = await Promise.all([
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_public_key'" }),
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_url_endpoint'" })
-        ]);
-        const publicKey = pubRes.rows[0]?.value;
-        const urlEndpoint = urlRes.rows[0]?.value;
-        if (!publicKey) return res.status(500).json({ error: 'ImageKit not configured.' });
+        const apiKey = await getApiKey();
+        if (!apiKey) return res.status(500).json({ error: 'Byse not configured.' });
 
-        const ik = await getImageKit();
-        if (!ik || !ik.helper) return res.status(500).json({ error: 'ImageKit not configured.' });
-        const auth = ik.helper.getAuthenticationParameters();
-        res.json({
-            token: auth.token,
-            signature: auth.signature,
-            expire: auth.expire,
-            publicKey,
-            urlEndpoint: urlEndpoint || ''
-        });
+        const uploadServer = await getUploadServer();
+        res.json({ uploadServer, apiKey });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

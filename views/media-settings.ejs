@@ -4,7 +4,7 @@
     <main class="ml-64 flex-1 p-8 min-h-screen bg-gray-50">
         <div class="mb-8">
             <h1 class="text-2xl font-bold text-gray-900">Media Settings</h1>
-            <p class="text-gray-500 text-sm mt-1">Configure ImageKit for video uploads and streaming</p>
+            <p class="text-gray-500 text-sm mt-1">Configure Byse.sx for video uploads and streaming</p>
         </div>
 
         <% if (locals.flash) { %>
@@ -14,16 +14,9 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-2xl">
             <form method="POST" action="/admin/media-settings">
                 <div class="mb-5">
-                    <label class="text-sm font-medium text-gray-700 block mb-1.5">Public Key</label>
-                    <input type="text" name="imagekit_public_key" value="<%= publicKey %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30">
-                </div>
-                <div class="mb-5">
-                    <label class="text-sm font-medium text-gray-700 block mb-1.5">Private Key</label>
-                    <input type="password" name="imagekit_private_key" value="<%= privateKey %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30">
-                </div>
-                <div class="mb-6">
-                    <label class="text-sm font-medium text-gray-700 block mb-1.5">URL Endpoint</label>
-                    <input type="text" name="imagekit_url_endpoint" value="<%= urlEndpoint %>" placeholder="https://ik.imagekit.io/your_id" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                    <label class="text-sm font-medium text-gray-700 block mb-1.5">Byse.sx API Key</label>
+                    <input type="password" name="byse_api_key" value="<%= byseApiKey %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                    <p class="text-xs text-gray-400 mt-1.5">Get your API key from <a href="https://byse.sx" target="_blank" class="text-blue-500 hover:underline">byse.sx</a></p>
                 </div>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors">Save Settings</button>
             </form>

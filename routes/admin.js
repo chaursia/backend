@@ -9,7 +9,7 @@ const multer = require('multer');
 const fs = require('fs');
 const crypto = require('crypto');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
-const { getImageKit } = require('../services/imagekitService');
+const { getApiKey } = require('../services/byseService');
 
 // Configure Multer for email attachments
 // NOTE: Use /tmp for Vercel serverless compatibility (read-only filesystem)
@@ -879,10 +879,10 @@ async function checkCloudinary() {
     }
 }
 
-async function checkImageKit() {
+async function checkByse() {
     try {
-        const ik = await getImageKit();
-        if (!ik) return { status: 'unconfigured' };
+        const key = await getApiKey();
+        if (!key) return { status: 'unconfigured' };
         return { status: 'configured' };
     } catch (e) {
         return { status: 'error', message: e.message };
@@ -904,7 +904,7 @@ router.get('/health', async (req, res) => {
         checkEndpoint(API_BASE),
         checkEndpoint(`${API_BASE}/college/information`),
         checkCloudinary(),
-        checkImageKit(),
+        checkByse(),
     ]);
 
     const get = (i, def) => results[i]?.status === 'fulfilled' ? results[i].value : def;
@@ -928,7 +928,7 @@ router.get('/health', async (req, res) => {
             collegeApi: get(7, { status: 'unreachable', code: null }),
             collegeInfo: get(8, { status: 'unreachable', code: null }),
             cloudinary: get(9, { status: 'unreachable', code: null }),
-            imagekit: get(10, { status: 'unreachable' }),
+            byse: get(10, { status: 'unreachable' }),
         }
     });
 });
@@ -1004,7 +1004,7 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
         }
 
         if (req.files?.video?.[0]) {
-            const { uploadVideo } = require('../services/imagekitService');
+            const { uploadVideo } = require('../services/byseService');
             const result = await uploadVideo(req.files.video[0].buffer, req.files.video[0].originalname, req.files.video[0].mimetype);
             videoUrl = result.url;
             videoFileId = result.fileId;
@@ -1080,7 +1080,7 @@ router.post('/social/post/:id/delete', async (req, res) => {
                 }
             }
             if (post.video_file_id) {
-                const { deleteVideo } = require('../services/imagekitService');
+                const { deleteVideo } = require('../services/byseService');
                 await deleteVideo(post.video_file_id);
             }
         }
@@ -1156,20 +1156,14 @@ router.post('/app-settings', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-//  MEDIA SETTINGS (ImageKit)
+//  MEDIA SETTINGS (Byse.sx)
 // ─────────────────────────────────────────────
 
 router.get('/media-settings', async (req, res) => {
     try {
-        const [pubRes, privRes, urlRes] = await Promise.all([
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_public_key'" }),
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_private_key'" }),
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_url_endpoint'" })
-        ]);
+        const keyRes = await db.execute({ sql: "SELECT value FROM app_config WHERE key = 'byse_api_key'" });
         res.render('media-settings', {
-            publicKey: pubRes.rows[0]?.value || '',
-            privateKey: privRes.rows[0]?.value || '',
-            urlEndpoint: urlRes.rows[0]?.value || '',
+            byseApiKey: keyRes.rows[0]?.value || '',
             flash: null
         });
     } catch (err) {
@@ -1179,25 +1173,15 @@ router.get('/media-settings', async (req, res) => {
 
 router.post('/media-settings', async (req, res) => {
     try {
-        const { imagekit_public_key, imagekit_private_key, imagekit_url_endpoint } = req.body;
-        const entries = [
-            ['imagekit_public_key', imagekit_public_key],
-            ['imagekit_private_key', imagekit_private_key],
-            ['imagekit_url_endpoint', imagekit_url_endpoint]
-        ];
-        for (const [key, value] of entries) {
-            if (value) {
-                await db.execute({
-                    sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-                    args: [key, value]
-                });
-            }
+        const { byse_api_key } = req.body;
+        if (byse_api_key) {
+            await db.execute({
+                sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                args: ['byse_api_key', byse_api_key]
+            });
         }
-        // Clear cached ImageKit instance
-        const { clearInstance } = require('../services/imagekitService');
-        clearInstance();
 
-        await logAudit(req.adminUser, 'update_media_settings', 'system', 'imagekit');
+        await logAudit(req.adminUser, 'update_media_settings', 'system', 'byse');
         res.redirect('/admin/media-settings?saved=1');
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
