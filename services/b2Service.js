@@ -49,7 +49,7 @@ async function uploadFile(buffer, originalName, mimeType) {
         method: 'POST',
         headers: {
             'Authorization': uploadInfo.authorizationToken,
-            'X-Bz-File-Name': encodeURI(b2FileName),
+            'X-Bz-File-Name': encodeURIComponent(b2FileName).replace(/%2F/g, '/'),
             'Content-Type': mimeType,
             'X-Bz-Content-Sha1': sha1,
             'Content-Length': buffer.length.toString()
