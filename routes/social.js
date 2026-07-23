@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
+const { uploadVideo: uploadToImageKit, deleteVideo: deleteFromImageKit } = require('../services/imagekitService');
 
 const router = express.Router();
 
@@ -78,9 +79,9 @@ router.get('/feed', requireSocialAccess, async (req, res) => {
         const offset = (page - 1) * limit;
 
         // Massive JOIN query to fulfill architectural requirements
-        const feedSql = `
-            SELECT 
-                p.id, p.content, p.media_url, p.media_type, p.created_at, p.is_repost,
+    const feedSql = `
+        SELECT 
+            p.id, p.content, p.media_url, p.media_type, p.video_url, p.created_at, p.is_repost,
                 u.name as author_name, u.semester as author_semester, u.section as author_section, u.profile_image as author_image,
                 u.verify_badge as author_verified,
                 (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
@@ -183,13 +184,17 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
                     }
                 }
             } catch {
-                // Backward compat: single pipe format "url|public_id"
                 const parts = post.media_url.split('|');
                 const publicId = parts.length > 1 ? parts[1] : null;
                 if (publicId) {
                     await deleteFromCloudinary(publicId).catch(err => console.error("Cloudinary Cleanup Failed:", err));
                 }
             }
+        }
+
+        // Cleanup ImageKit video
+        if (post.video_file_id) {
+            await deleteFromImageKit(post.video_file_id).catch(err => console.error("ImageKit Cleanup Failed:", err));
         }
 
         // 3. Delete from Turso (Likes and comments will be orphaned or CASCADE if set, 
@@ -214,9 +219,9 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  */
 router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
-        const { content } = req.body;
+        const { content, video_url, video_file_id } = req.body;
         const files = req.files || [];
-        if (!content && files.length === 0) {
+        if (!content && files.length === 0 && !video_url) {
             return res.status(400).json({ error: 'Post must contain text or media.' });
         }
 
@@ -230,21 +235,44 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         }
 
         const postId = crypto.randomUUID();
+        let mediaType = null;
+        if (video_url) mediaType = 'video';
+        else if (mediaEntries.length > 0) mediaType = 'image';
+
         await db.execute({
-            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type) VALUES (?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 postId,
                 req.userId,
                 content || '',
                 mediaEntries.length > 0 ? JSON.stringify(mediaEntries) : null,
-                mediaEntries.length > 0 ? 'image' : null
+                mediaType,
+                video_url || null,
+                video_file_id || null
             ]
         });
 
-        res.json({ success: true, message: 'Post created.' });
+        res.json({ success: true, message: 'Post created.', postId });
     } catch (e) {
         console.error("Post Creation Error:", e);
         res.status(500).json({ error: 'Failed to create post.' });
+    }
+});
+
+/**
+ * POST /social/upload/video
+ * Upload a video to ImageKit and return URL/fileId.
+ */
+router.post('/upload/video', requireSocialAccess, upload.single('video'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No video file provided.' });
+        if (!req.file.mimetype.startsWith('video/')) {
+            return res.status(400).json({ error: 'File must be a video.' });
+        }
+        const result = await uploadToImageKit(req.file.buffer, req.file.originalname, req.file.mimetype);
+        res.json({ url: result.url, fileId: result.fileId, thumbnail: result.thumbnail });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 

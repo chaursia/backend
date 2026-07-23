@@ -52,9 +52,9 @@
                                 </div>
                             </div>
 
-                            <!-- Media Upload Section -->
+                            <!-- Image/Media Upload Section -->
                             <div class="space-y-3">
-                                <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide">Attach Media (Optional)</label>
+                                <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide">Attach Image / Document (Optional)</label>
                                 <div class="relative group border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-all cursor-pointer">
                                     <input type="file" id="media" name="media" class="absolute inset-0 opacity-0 cursor-pointer" 
                                            onchange="previewFile(event)" accept="image/*,.pdf,.docx">
@@ -67,7 +67,6 @@
                                         <p class="text-gray-500 text-sm">PNG, JPG, PDF, or DOCX up to 10MB</p>
                                     </div>
 
-                                    <!-- Preview Window -->
                                     <div id="file-preview" class="hidden space-y-4">
                                         <div id="media-preview-container" class="relative inline-block">
                                             <img id="image-preview" src="" class="hidden max-w-full h-48 rounded-xl shadow-lg border border-white">
@@ -84,6 +83,27 @@
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                             </button>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Video Upload Section -->
+                            <div class="space-y-3">
+                                <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide">Attach Video (Optional)</label>
+                                <div class="relative group border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-purple-400 hover:bg-purple-50 transition-all cursor-pointer">
+                                    <input type="file" id="video" name="video" class="absolute inset-0 opacity-0 cursor-pointer"
+                                           onchange="previewVideo(event)" accept="video/*">
+                                    <div id="video-upload-prompt" class="space-y-2">
+                                        <div class="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto transition-transform group-hover:scale-110">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                        </div>
+                                        <div class="text-gray-900 font-semibold text-lg">Upload a video</div>
+                                        <p class="text-gray-500 text-sm">MP4, WebM, MOV — up to 200MB</p>
+                                    </div>
+                                    <div id="video-preview" class="hidden space-y-3">
+                                        <video id="video-preview-player" controls class="max-w-full h-48 rounded-xl shadow-lg mx-auto"></video>
+                                        <p id="video-filename" class="text-sm text-gray-500"></p>
+                                        <button type="button" onclick="resetVideo()" class="text-red-500 text-sm hover:underline">Remove</button>
                                     </div>
                                 </div>
                             </div>
@@ -153,6 +173,28 @@
             document.getElementById('upload-prompt').classList.remove('hidden');
             document.getElementById('file-preview').classList.add('hidden');
             document.getElementById('image-preview').src = '';
+        }
+
+        function previewVideo(event) {
+            const input = event.target;
+            const prompt = document.getElementById('video-upload-prompt');
+            const preview = document.getElementById('video-preview');
+            const player = document.getElementById('video-preview-player');
+            const filename = document.getElementById('video-filename');
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                prompt.classList.add('hidden');
+                preview.classList.remove('hidden');
+                player.src = URL.createObjectURL(file);
+                filename.textContent = file.name;
+            }
+        }
+
+        function resetVideo() {
+            document.getElementById('video').value = '';
+            document.getElementById('video-upload-prompt').classList.remove('hidden');
+            document.getElementById('video-preview').classList.add('hidden');
+            document.getElementById('video-preview-player').src = '';
         }
     </script>
 </body>
