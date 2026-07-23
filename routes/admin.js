@@ -1031,7 +1031,8 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
                     putReq.end();
                 });
                 if (!uploadOk) throw new Error('VoidDrive PUT upload failed');
-                mediaUrl = `https://voiddrive.org/d/${fileId}|${fileId}|${file.originalname}`;
+                const downloadBase = `${req.protocol}://${req.get('host')}/social/download/document`;
+                mediaUrl = `${downloadBase}/${fileId}|${fileId}|${file.originalname}`;
                 mediaType = 'document';
                 voiddriveFileId = fileId;
             }

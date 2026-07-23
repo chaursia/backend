@@ -275,7 +275,8 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
                         putReq.end();
                     });
                     if (!uploadOk) throw new Error('VoidDrive PUT upload failed');
-                    mediaEntries.push(`https://voiddrive.org/d/${fileId}|${fileId}|${file.originalname}`);
+                    const downloadBase = `${req.protocol}://${req.get('host')}/social/download/document`;
+                    mediaEntries.push(`${downloadBase}/${fileId}|${fileId}|${file.originalname}`);
                     voiddriveFileId = fileId;
                 }
             }
@@ -285,7 +286,8 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         if (!voiddriveFileId && voiddrive_file_id) {
             voiddriveFileId = voiddrive_file_id;
             const docName = voiddrive_file_name || 'document';
-            mediaEntries.push(`https://voiddrive.org/d/${voiddrive_file_id}|${voiddrive_file_id}|${docName}`);
+            const downloadBase = `${req.protocol}://${req.get('host')}/social/download/document`;
+            mediaEntries.push(`${downloadBase}/${voiddrive_file_id}|${voiddrive_file_id}|${docName}`);
         }
 
         const postId = crypto.randomUUID();

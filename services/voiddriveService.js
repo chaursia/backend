@@ -14,6 +14,7 @@ async function getUploadUrl(fileName, size, contentType) {
     if (!apiKey) throw new Error('VoidDrive not configured.');
 
     const path = `/social_documents/${Date.now()}_${fileName}`;
+    console.log('[VoidDrive] Requesting upload-url for', { path, size, contentType });
     const res = await fetch(`${API_BASE}/files/upload-url`, {
         method: 'POST',
         headers: {
@@ -22,8 +23,11 @@ async function getUploadUrl(fileName, size, contentType) {
         },
         body: JSON.stringify({ path, size, content_type: contentType })
     });
-    const json = await res.json();
-    if (!json.url || !json.token) throw new Error('VoidDrive upload-url failed: ' + JSON.stringify(json));
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch { json = null; }
+    console.log('[VoidDrive] upload-url response status=' + res.status + ' body=' + text);
+    if (!json || !json.url || !json.token) throw new Error('VoidDrive upload-url failed: ' + text);
     return { uploadUrl: json.url, fileId: json.token };
 }
 
