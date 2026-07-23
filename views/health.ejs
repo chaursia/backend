@@ -24,7 +24,7 @@
                     <line x1="150" y1="110" x2="550" y2="110" stroke="<%= lineColor(health.collegeApi.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="550" y2="180" stroke="<%= lineColor(health.collegeInfo.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
                     <line x1="150" y1="110" x2="800" y2="85" stroke="<%= lineColor(health.byse.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
-                    <line x1="150" y1="110" x2="800" y2="155" stroke="<%= lineColor(health.filelu.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
+                    <line x1="150" y1="110" x2="800" y2="155" stroke="<%= lineColor(health.voiddrive.status) %>" stroke-width="2.5" class="net-line" stroke-dasharray="6,3"/>
 
                     <!-- Node: Server -->
                     <rect x="20" y="85" width="130" height="50" rx="10" fill="#1e293b"/>
@@ -68,11 +68,11 @@
                     <text x="860" y="87" text-anchor="middle" fill="<%= bsOk ? '#16a34a' : (bsUncfg ? '#ca8a04' : '#dc2626') %>" font-size="13" font-weight="bold">Byse.sx</text>
                     <text x="860" y="101" text-anchor="middle" fill="#64748b" font-size="10"><%= bsOk ? 'Configured' : (bsUncfg ? 'Unconfigured' : 'Error') %></text>
 
-                    <!-- Node: FileLu -->
-                    <% const flStat = health.filelu?.status; const flOk = flStat === 'configured'; const flUncfg = flStat === 'unconfigured'; %>
-                    <rect x="800" y="130" width="120" height="50" rx="10" fill="<%= flOk ? '#dcfce7' : (flUncfg ? '#fef9c3' : '#fee2e2') %>" stroke="<%= lineColor(flStat) %>" stroke-width="2"/>
-                    <text x="860" y="157" text-anchor="middle" fill="<%= flOk ? '#16a34a' : (flUncfg ? '#ca8a04' : '#dc2626') %>" font-size="13" font-weight="bold">FileLu</text>
-                    <text x="860" y="171" text-anchor="middle" fill="#64748b" font-size="10"><%= flOk ? 'Configured' : (flUncfg ? 'Unconfigured' : 'Error') %></text>
+                    <!-- Node: VoidDrive -->
+                    <% const vdStat = health.voiddrive?.status; const vdOk = vdStat === 'configured'; const vdUncfg = vdStat === 'unconfigured'; %>
+                    <rect x="800" y="130" width="120" height="50" rx="10" fill="<%= vdOk ? '#dcfce7' : (vdUncfg ? '#fef9c3' : '#fee2e2') %>" stroke="<%= lineColor(vdStat) %>" stroke-width="2"/>
+                    <text x="860" y="157" text-anchor="middle" fill="<%= vdOk ? '#16a34a' : (vdUncfg ? '#ca8a04' : '#dc2626') %>" font-size="13" font-weight="bold">VoidDrive</text>
+                    <text x="860" y="171" text-anchor="middle" fill="#64748b" font-size="10"><%= vdOk ? 'Configured' : (vdUncfg ? 'Unconfigured' : 'Error') %></text>
                 </svg>
             </div>
         </div>
@@ -197,19 +197,19 @@
 
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <%
-                    let flColor = 'red';
-                    let flLabel = health.filelu?.status || 'Unknown';
-                    if (health.filelu?.status === 'configured') { flColor = 'green'; flLabel = 'Configured'; }
-                    if (health.filelu?.status === 'unconfigured') { flColor = 'amber'; flLabel = 'Unconfigured'; }
+                    let vdColor = 'red';
+                    let vdLabel = health.voiddrive?.status || 'Unknown';
+                    if (health.voiddrive?.status === 'configured') { vdColor = 'green'; vdLabel = 'Configured'; }
+                    if (health.voiddrive?.status === 'unconfigured') { vdColor = 'amber'; vdLabel = 'Unconfigured'; }
                 %>
                 <div class="flex items-center justify-between mb-4">
-                    <div class="w-10 h-10 rounded-xl bg-<%= flColor %>-100 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-<%= flColor %>-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-<%= vdColor %>-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-<%= vdColor %>-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     </div>
-                    <span class="w-2.5 h-2.5 rounded-full bg-<%= flColor %>-500 <%= health.filelu?.status === 'configured' ? 'animate-pulse' : '' %>"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-<%= vdColor %>-500 <%= health.voiddrive?.status === 'configured' ? 'animate-pulse' : '' %>"></span>
                 </div>
-                <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">FileLu</div>
-                <div class="text-lg font-bold text-<%= flColor %>-600 capitalize"><%= flLabel %></div>
+                <div class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">VoidDrive</div>
+                <div class="text-lg font-bold text-<%= vdColor %>-600 capitalize"><%= vdLabel %></div>
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

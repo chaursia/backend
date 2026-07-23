@@ -26,15 +26,15 @@
                 </form>
             </div>
 
-            <!-- FileLu -->
+            <!-- VoidDrive -->
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                <h2 class="text-lg font-bold text-gray-900 mb-1">FileLu — Document Uploads</h2>
+                <h2 class="text-lg font-bold text-gray-900 mb-1">VoidDrive — Document Uploads</h2>
                 <p class="text-xs text-gray-400 mb-5">Used for uploading PDFs and documents to social feed posts</p>
-                <form method="POST" action="/admin/media-settings/filelu">
+                <form method="POST" action="/admin/media-settings/voiddrive">
                     <div class="mb-5">
                         <label class="text-sm font-medium text-gray-700 block mb-1.5">API Key</label>
-                        <input type="password" name="filelu_api_key" value="<%= fileluApiKey %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30">
-                        <p class="text-xs text-gray-400 mt-1.5">Get your API key from <a href="https://filelu.com/account/" target="_blank" class="text-blue-500 hover:underline">filelu.com/account</a></p>
+                        <input type="password" name="voiddrive_api_key" value="<%= voiddriveApiKey %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                        <p class="text-xs text-gray-400 mt-1.5">Get your API key from <a href="https://voiddrive.org" target="_blank" class="text-blue-500 hover:underline">voiddrive.org</a></p>
                     </div>
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors">Save Settings</button>
                 </form>

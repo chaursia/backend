@@ -10,7 +10,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 const { getApiKey: getByseApiKey } = require('../services/byseService');
-const { getApiKey: getFileluApiKey } = require('../services/fileluService');
+const { getApiKey: getVoidDriveApiKey } = require('../services/voiddriveService');
 
 // Configure Multer for email attachments
 // NOTE: Use /tmp for Vercel serverless compatibility (read-only filesystem)
@@ -890,9 +890,9 @@ async function checkByse() {
     }
 }
 
-async function checkFilelu() {
+async function checkVoidDrive() {
     try {
-        const key = await getFileluApiKey();
+        const key = await getVoidDriveApiKey();
         if (!key) return { status: 'unconfigured' };
         return { status: 'configured' };
     } catch (e) {
@@ -916,7 +916,7 @@ router.get('/health', async (req, res) => {
         checkEndpoint(`${API_BASE}/college/information`),
         checkCloudinary(),
         checkByse(),
-        checkFilelu(),
+        checkVoidDrive(),
     ]);
 
     const get = (i, def) => results[i]?.status === 'fulfilled' ? results[i].value : def;
@@ -941,7 +941,7 @@ router.get('/health', async (req, res) => {
             collegeInfo: get(8, { status: 'unreachable', code: null }),
             cloudinary: get(9, { status: 'unreachable', code: null }),
             byse: get(10, { status: 'unreachable' }),
-            filelu: get(11, { status: 'unreachable' }),
+            voiddrive: get(11, { status: 'unreachable' }),
         }
     });
 });
@@ -1006,7 +1006,7 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
         let mediaUrl = null;
         let mediaType = null;
         let publicId = null;
-        let fileluFileId = null;
+        let voiddriveFileId = null;
         let videoUrl = null;
         let videoFileId = null;
 
@@ -1018,11 +1018,22 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
                 mediaType = 'image';
                 publicId = uploadResult.public_id;
             } else {
-                const { uploadDocument } = require('../services/fileluService');
-                const result = await uploadDocument(file.buffer, file.originalname, file.mimetype);
-                mediaUrl = `${result.url}|${result.fileCode}`;
+                const { getUploadUrl: getVoidDriveUploadUrl } = require('../services/voiddriveService');
+                const { uploadUrl, fileId } = await getVoidDriveUploadUrl(file.originalname, file.size, file.mimetype);
+                const https = require('https');
+                const uploadOk = await new Promise((resolve) => {
+                    const putReq = https.request(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.mimetype, 'Content-Length': file.size } }, (putRes) => {
+                        putRes.resume();
+                        resolve(putRes.statusCode >= 200 && putRes.statusCode < 300);
+                    });
+                    putReq.on('error', () => resolve(false));
+                    putReq.write(file.buffer);
+                    putReq.end();
+                });
+                if (!uploadOk) throw new Error('VoidDrive PUT upload failed');
+                mediaUrl = `https://voiddrive.org/d/${fileId}|${fileId}|${file.originalname}`;
                 mediaType = 'document';
-                fileluFileId = result.fileCode;
+                voiddriveFileId = fileId;
             }
         }
 
@@ -1036,8 +1047,8 @@ router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 },
 
         const postId = crypto.randomUUID();
         await db.execute({
-            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, filelu_file_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [postId, adminUserId, content || '', mediaUrl, mediaType, videoUrl, videoFileId, fileluFileId]
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, voiddrive_file_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [postId, adminUserId, content || '', mediaUrl, mediaType, videoUrl, videoFileId, voiddriveFileId]
         });
 
         await logAudit(req.adminUser, 'admin_social_post', 'post', postId, { content: (content || '').substring(0, 50) });
@@ -1092,9 +1103,9 @@ router.get('/social', async (req, res) => {
 router.post('/social/post/:id/delete', async (req, res) => {
     try {
         const { deleteFromCloudinary } = require('../services/cloudinaryService');
-        const { deleteDocument } = require('../services/fileluService');
+        const { deleteFile: deleteVoidDriveFile } = require('../services/voiddriveService');
         const { deleteVideo } = require('../services/byseService');
-        const postRes = await db.execute({ sql: `SELECT media_url, media_type, video_file_id, filelu_file_id FROM social_posts WHERE id = ?`, args: [req.params.id]});
+        const postRes = await db.execute({ sql: `SELECT media_url, media_type, video_file_id, voiddrive_file_id FROM social_posts WHERE id = ?`, args: [req.params.id]});
         
         if (postRes.rows.length > 0) {
             const post = postRes.rows[0];
@@ -1104,8 +1115,8 @@ router.post('/social/post/:id/delete', async (req, res) => {
                     await deleteFromCloudinary(parts[1]).catch(() => {});
                 }
             }
-            if (post.filelu_file_id) {
-                await deleteDocument(post.filelu_file_id);
+            if (post.voiddrive_file_id) {
+                await deleteVoidDriveFile(post.voiddrive_file_id);
             }
             if (post.video_file_id) {
                 await deleteVideo(post.video_file_id);
@@ -1188,13 +1199,13 @@ router.post('/app-settings', async (req, res) => {
 
 router.get('/media-settings', async (req, res) => {
     try {
-        const [byseRes, fileluRes] = await Promise.all([
+        const [byseRes, voiddriveRes] = await Promise.all([
             db.execute({ sql: "SELECT value FROM app_config WHERE key = 'byse_api_key'" }),
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'filelu_api_key'" })
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'voiddrive_api_key'" })
         ]);
         res.render('media-settings', {
             byseApiKey: byseRes.rows[0]?.value || '',
-            fileluApiKey: fileluRes.rows[0]?.value || '',
+            voiddriveApiKey: voiddriveRes.rows[0]?.value || '',
             flash: null
         });
     } catch (err) {
@@ -1219,17 +1230,17 @@ router.post('/media-settings', async (req, res) => {
     }
 });
 
-router.post('/media-settings/filelu', async (req, res) => {
+router.post('/media-settings/voiddrive', async (req, res) => {
     try {
-        const { filelu_api_key } = req.body;
-        if (filelu_api_key) {
+        const { voiddrive_api_key } = req.body;
+        if (voiddrive_api_key) {
             await db.execute({
                 sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-                args: ['filelu_api_key', filelu_api_key]
+                args: ['voiddrive_api_key', voiddrive_api_key]
             });
         }
 
-        await logAudit(req.adminUser, 'update_media_settings', 'system', 'filelu');
+        await logAudit(req.adminUser, 'update_media_settings', 'system', 'voiddrive');
         res.redirect('/admin/media-settings?saved=1');
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
