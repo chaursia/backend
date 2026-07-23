@@ -32,7 +32,7 @@ async function uploadVideo(buffer, fileName, mimeType) {
 
     if (json.files?.[0]?.status === 'OK') {
         const filecode = json.files[0].filecode;
-        return { url: `https://byse.sx/e/${filecode}`, fileId: filecode, thumbnail: null };
+        return { url: `https://bysedikamoum.com/e/${filecode}`, fileId: filecode, thumbnail: null };
     }
     throw new Error('Byse upload failed: ' + JSON.stringify(json));
 }
