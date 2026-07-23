@@ -10,6 +10,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 const { getApiKey: getByseApiKey } = require('../services/byseService');
+const { deleteFile: deleteFromB2 } = require('../services/b2Service');
 
 // Configure Multer for email attachments
 // NOTE: Use /tmp for Vercel serverless compatibility (read-only filesystem)

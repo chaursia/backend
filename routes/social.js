@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { db, supabase } = require('../db');
 const sessionStore = require('../utils/sessionStore');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
-const { uploadVideo: uploadToByse, deleteVideo: deleteFromByse } = require('../services/byseService');
+const { getApiKey, getUploadServer, uploadVideo: uploadToByse, deleteVideo: deleteFromByse } = require('../services/byseService');
 const { uploadFile: uploadToB2, deleteFile: deleteFromB2, getDownloadUrl: getB2DownloadUrl } = require('../services/b2Service');
 
 const router = express.Router();
@@ -448,9 +448,11 @@ router.post('/post/:id/report', requireSocialAccess, async (req, res) => {
  * GET /social/download/document/:fileName
  * Redirects to a B2 signed download URL.
  */
-router.get('/download/document/:fileName(*)', async (req, res) => {
+router.get('/download/document/*fileName', async (req, res) => {
     try {
-        const url = await getB2DownloadUrl(req.params.fileName);
+        const fileName = Array.isArray(req.params.fileName) ? req.params.fileName.join('/') : (req.params.fileName || '');
+        if (!fileName) return res.status(404).json({ error: 'File not specified.' });
+        const url = await getB2DownloadUrl(fileName);
         if (!url) return res.status(404).json({ error: 'Download URL not available.' });
         res.redirect(url);
     } catch (e) {
