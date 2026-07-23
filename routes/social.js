@@ -81,7 +81,7 @@ router.get('/feed', requireSocialAccess, async (req, res) => {
         // Massive JOIN query to fulfill architectural requirements
     const feedSql = `
         SELECT 
-            p.id, p.content, p.media_url, p.media_type, p.video_url, p.created_at, p.is_repost,
+            p.id, p.content, p.media_url, p.media_type, p.video_url, p.video_file_id, p.video_thumbnail, p.created_at, p.is_repost,
                 u.name as author_name, u.semester as author_semester, u.section as author_section, u.profile_image as author_image,
                 u.verify_badge as author_verified,
                 (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
@@ -118,7 +118,7 @@ router.get('/user/posts', requireSocialAccess, async (req, res) => {
     try {
         const userPostsSql = `
             SELECT 
-                p.id, p.content, p.media_url, p.media_type, p.created_at, p.is_repost,
+                p.id, p.content, p.media_url, p.media_type, p.video_url, p.video_file_id, p.video_thumbnail, p.created_at, p.is_repost,
                 u.name as author_name, u.semester as author_semester, u.section as author_section, u.profile_image as author_image,
                 u.verify_badge as author_verified,
                 (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
@@ -219,7 +219,7 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  */
 router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
-        const { content, video_url, video_file_id } = req.body;
+        const { content, video_url, video_file_id, video_thumbnail } = req.body;
         const files = req.files || [];
         if (!content && files.length === 0 && !video_url) {
             return res.status(400).json({ error: 'Post must contain text or media.' });
@@ -239,8 +239,15 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
         if (video_url) mediaType = 'video';
         else if (mediaEntries.length > 0) mediaType = 'image';
 
+        try {
+            await db.execute({
+                sql: `ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT`,
+                args: []
+            });
+        } catch (_) {}
+
         await db.execute({
-            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id, video_thumbnail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 postId,
                 req.userId,
@@ -248,7 +255,8 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
                 mediaEntries.length > 0 ? JSON.stringify(mediaEntries) : null,
                 mediaType,
                 video_url || null,
-                video_file_id || null
+                video_file_id || null,
+                video_thumbnail || null
             ]
         });
 
