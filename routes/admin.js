@@ -971,7 +971,7 @@ router.get('/social/post', (req, res) => {
     });
 });
 
-router.post('/social/post', socialUpload.single('media'), async (req, res) => {
+router.post('/social/post', socialUpload.fields([{ name: 'media', maxCount: 1 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
     const { content } = req.body;
     try {
         const adminUserId = await ensureAdminUser();
@@ -980,18 +980,28 @@ router.post('/social/post', socialUpload.single('media'), async (req, res) => {
         let mediaUrl = null;
         let mediaType = null;
         let publicId = null;
+        let videoUrl = null;
+        let videoFileId = null;
 
-        if (req.file) {
-            const uploadResult = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
+        if (req.files?.media?.[0]) {
+            const uploadResult = await uploadToCloudinary(req.files.media[0].buffer, req.files.media[0].mimetype);
             mediaUrl = uploadResult.url;
             mediaType = uploadResult.type;
             publicId = uploadResult.public_id;
         }
 
+        if (req.files?.video?.[0]) {
+            const { uploadVideo } = require('../services/imagekitService');
+            const result = await uploadVideo(req.files.video[0].buffer, req.files.video[0].originalname, req.files.video[0].mimetype);
+            videoUrl = result.url;
+            videoFileId = result.fileId;
+            mediaType = 'video';
+        }
+
         const postId = crypto.randomUUID();
         await db.execute({
-            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type) VALUES (?, ?, ?, ?, ?)`,
-            args: [postId, adminUserId, content || '', publicId ? `${mediaUrl}|${publicId}` : mediaUrl, mediaType]
+            sql: `INSERT INTO social_posts (id, user_id, content, media_url, media_type, video_url, video_file_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            args: [postId, adminUserId, content || '', publicId ? `${mediaUrl}|${publicId}` : mediaUrl, mediaType, videoUrl, videoFileId]
         });
 
         await logAudit(req.adminUser, 'admin_social_post', 'post', postId, { content: (content || '').substring(0, 50) });
@@ -1017,7 +1027,7 @@ router.get('/social', async (req, res) => {
     try {
         const [postsRes, reportsRes] = await Promise.all([
             db.execute(`
-                SELECT p.*, u.name as author_name, 
+                SELECT p.*, u.name as author_name, u.semester, u.section, u.verify_badge,
                 (SELECT COUNT(*) FROM post_reports WHERE post_id = p.id AND status = 'pending') as report_count
                 FROM social_posts p 
                 JOIN users u ON p.user_id = u.id 
@@ -1046,16 +1056,22 @@ router.get('/social', async (req, res) => {
 router.post('/social/post/:id/delete', async (req, res) => {
     try {
         const { deleteFromCloudinary } = require('../services/cloudinaryService');
-        const postRes = await db.execute({ sql: `SELECT media_url, media_type FROM social_posts WHERE id = ?`, args: [req.params.id]});
+        const postRes = await db.execute({ sql: `SELECT media_url, media_type, video_file_id FROM social_posts WHERE id = ?`, args: [req.params.id]});
         
-        if (postRes.rows.length > 0 && postRes.rows[0].media_url) {
-            const parts = postRes.rows[0].media_url.split('|');
-            if (parts.length > 1) {
-                await deleteFromCloudinary(parts[1], postRes.rows[0].media_type === 'document' ? 'raw' : 'image');
+        if (postRes.rows.length > 0) {
+            const post = postRes.rows[0];
+            if (post.media_url) {
+                const parts = post.media_url.split('|');
+                if (parts.length > 1) {
+                    await deleteFromCloudinary(parts[1], post.media_type === 'document' ? 'raw' : 'image');
+                }
+            }
+            if (post.video_file_id) {
+                const { deleteVideo } = require('../services/imagekitService');
+                await deleteVideo(post.video_file_id);
             }
         }
 
-        // Deleting from Turso cascades to likes, comments, and reports
         await db.execute({ sql: `DELETE FROM social_posts WHERE id = ?`, args: [req.params.id]});
         res.redirect('/admin/social?success=1');
     } catch (err) {
@@ -1123,6 +1139,55 @@ router.post('/app-settings', async (req, res) => {
     } catch (err) {
         console.error('Settings Update Error:', err);
         res.status(500).send('Error updating settings: ' + err.message);
+    }
+});
+
+// ─────────────────────────────────────────────
+//  MEDIA SETTINGS (ImageKit)
+// ─────────────────────────────────────────────
+
+router.get('/media-settings', async (req, res) => {
+    try {
+        const [pubRes, privRes, urlRes] = await Promise.all([
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_public_key'" }),
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_private_key'" }),
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'imagekit_url_endpoint'" })
+        ]);
+        res.render('media-settings', {
+            publicKey: pubRes.rows[0]?.value || '',
+            privateKey: privRes.rows[0]?.value || '',
+            urlEndpoint: urlRes.rows[0]?.value || '',
+            flash: null
+        });
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+router.post('/media-settings', async (req, res) => {
+    try {
+        const { imagekit_public_key, imagekit_private_key, imagekit_url_endpoint } = req.body;
+        const entries = [
+            ['imagekit_public_key', imagekit_public_key],
+            ['imagekit_private_key', imagekit_private_key],
+            ['imagekit_url_endpoint', imagekit_url_endpoint]
+        ];
+        for (const [key, value] of entries) {
+            if (value) {
+                await db.execute({
+                    sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                    args: [key, value]
+                });
+            }
+        }
+        // Clear cached ImageKit instance
+        const { clearInstance } = require('../services/imagekitService');
+        clearInstance();
+
+        await logAudit(req.adminUser, 'update_media_settings', 'system', 'imagekit');
+        res.redirect('/admin/media-settings?saved=1');
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
     }
 });
 
