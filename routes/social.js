@@ -283,6 +283,18 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
             }
         }
 
+        // Auto-fetch thumbnail from Byse if video_file_id present but no thumbnail provided
+        let finalThumbnail = video_thumbnail || null;
+        if (video_file_id && !finalThumbnail) {
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const fetched = await getThumbnail(video_file_id);
+                    if (fetched) { finalThumbnail = fetched; break; }
+                } catch (_) {}
+                if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
         const postId = crypto.randomUUID();
         let mediaType = null;
         if (video_url) mediaType = 'video';
@@ -301,7 +313,7 @@ router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, 
                 mediaType,
                 video_url || null,
                 video_file_id || null,
-                video_thumbnail || null,
+                finalThumbnail,
                 b2FileId,
                 b2FileName
             ]

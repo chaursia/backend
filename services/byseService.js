@@ -53,8 +53,14 @@ async function getThumbnail(fileCode) {
     try {
         const res = await fetch(`${BYSE_API_BASE}/images/thumb?key=${apiKey}&file_code=${fileCode}`);
         const json = await res.json();
-        return json.result?.thumbnail || null;
+        console.log(`[Byse] Thumb response for ${fileCode}:`, JSON.stringify(json));
+        if (json.result?.thumbnail) return json.result.thumbnail;
+        // Try other possible response keys
+        if (json.result?.splash) return json.result.splash;
+        if (json.result?.url) return json.result.url;
+        return null;
     } catch (e) {
+        console.error(`[Byse] Thumb fetch failed for ${fileCode}:`, e.message);
         return null;
     }
 }
