@@ -248,9 +248,9 @@ router.delete('/post/:id', requireSocialAccess, async (req, res) => {
  */
 router.post('/post', requireSocialAccess, upload.array('media', 4), async (req, res) => {
     try {
-        const { content, video_url, video_file_id, video_thumbnail } = req.body;
+        const { content, video_url, video_file_id, video_thumbnail, filelu_file_id } = req.body;
         const files = req.files || [];
-        if (!content && files.length === 0 && !video_url) {
+        if (!content && files.length === 0 && !video_url && !filelu_file_id) {
             return res.status(400).json({ error: 'Post must contain text or media.' });
         }
 
