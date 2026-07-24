@@ -14,6 +14,15 @@ const handleError = (res, error) => {
 
 const MAX_DOCS_PER_USER = 20;
 
+async function isAdmin(userId) {
+    const configRes = await db.execute({
+        sql: "SELECT value FROM app_config WHERE key = 'library_admins'"
+    });
+    const adminIdsStr = configRes.rows[0]?.value || '';
+    const adminIds = adminIdsStr.split(',').map(s => s.trim()).filter(Boolean);
+    return adminIds.includes(String(userId));
+}
+
 router.use(async (req, res, next) => {
     const sessionId = req.headers['x-session-id'];
     if (!sessionId) {
@@ -66,14 +75,17 @@ router.post('/documents', async (req, res) => {
             return res.status(400).json({ error: 'File name is required.' });
         }
 
-        // Check per-user limit
-        const countRes = await db.execute({
-            sql: 'SELECT COUNT(*) as count FROM library_documents WHERE user_id = ?',
-            args: [req.user.id]
-        });
-        const currentCount = countRes.rows[0]?.count || 0;
-        if (currentCount >= MAX_DOCS_PER_USER) {
-            return res.status(403).json({ error: `Upload limit reached. You can upload up to ${MAX_DOCS_PER_USER} documents.` });
+        // Check per-user limit (admins bypass)
+        const adminUser = await isAdmin(req.user.id);
+        if (!adminUser) {
+            const countRes = await db.execute({
+                sql: 'SELECT COUNT(*) as count FROM library_documents WHERE user_id = ?',
+                args: [req.user.id]
+            });
+            const currentCount = countRes.rows[0]?.count || 0;
+            if (currentCount >= MAX_DOCS_PER_USER) {
+                return res.status(403).json({ error: `Upload limit reached. You can upload up to ${MAX_DOCS_PER_USER} documents.` });
+            }
         }
 
         const result = await db.execute({
@@ -111,13 +123,7 @@ router.get('/documents', async (req, res) => {
 // DELETE /api/library/documents/:id — admin delete only
 router.delete('/documents/:id', async (req, res) => {
     try {
-        // Check admin via app_config in Turso
-        const configRes = await db.execute({
-            sql: "SELECT value FROM app_config WHERE key = 'library_admins'"
-        });
-        const adminIdsStr = configRes.rows[0]?.value || '';
-        const adminIds = adminIdsStr.split(',').map(s => s.trim()).filter(Boolean);
-        if (!adminIds.includes(String(req.user.id))) {
+        if (!(await isAdmin(req.user.id))) {
             return res.status(403).json({ error: 'Only admins can delete documents.' });
         }
 
@@ -161,11 +167,12 @@ router.get('/download', async (req, res) => {
 // GET /api/library/documents/count — get current user's document count
 router.get('/documents/count', async (req, res) => {
     try {
+        const adminUser = await isAdmin(req.user.id);
         const countRes = await db.execute({
             sql: 'SELECT COUNT(*) as count FROM library_documents WHERE user_id = ?',
             args: [req.user.id]
         });
-        res.json({ count: countRes.rows[0]?.count || 0, max: MAX_DOCS_PER_USER });
+        res.json({ count: countRes.rows[0]?.count || 0, max: adminUser ? 999999 : MAX_DOCS_PER_USER });
     } catch (error) { handleError(res, error); }
 });
 
