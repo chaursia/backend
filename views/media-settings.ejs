@@ -26,6 +26,20 @@
                 </form>
             </div>
 
+            <!-- Library Settings -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h2 class="text-lg font-bold text-gray-900 mb-1">Library Settings</h2>
+                <p class="text-xs text-gray-400 mb-5">Configure who can delete documents from the App Library</p>
+                <form method="POST" action="/admin/media-settings/library">
+                    <div class="mb-5">
+                        <label class="text-sm font-medium text-gray-700 block mb-1.5">Admin User IDs</label>
+                        <input type="text" name="library_admins" value="<%= libraryAdmins %>" class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30" placeholder="e.g. 1, 5, 12">
+                        <p class="text-xs text-gray-400 mt-1.5">Comma-separated user IDs who can delete documents. Find IDs in the Users table.</p>
+                    </div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors">Save Settings</button>
+                </form>
+            </div>
+
             <!-- Backblaze B2 -->
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                 <h2 class="text-lg font-bold text-gray-900 mb-1">Backblaze B2 — Document Uploads</h2>

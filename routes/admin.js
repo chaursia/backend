@@ -1190,12 +1190,13 @@ router.post('/app-settings', async (req, res) => {
 
 router.get('/media-settings', async (req, res) => {
     try {
-        const [byseRes, b2IdRes, b2KeyRes, b2BucketRes, b2NameRes] = await Promise.all([
+        const [byseRes, b2IdRes, b2KeyRes, b2BucketRes, b2NameRes, libAdminsRes] = await Promise.all([
             db.execute({ sql: "SELECT value FROM app_config WHERE key = 'byse_api_key'" }),
             db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_application_key_id'" }),
             db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_application_key'" }),
             db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_bucket_id'" }),
-            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_bucket_name'" })
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'b2_bucket_name'" }),
+            db.execute({ sql: "SELECT value FROM app_config WHERE key = 'library_admins'" })
         ]);
         res.render('media-settings', {
             byseApiKey: byseRes.rows[0]?.value || '',
@@ -1203,6 +1204,7 @@ router.get('/media-settings', async (req, res) => {
             b2ApplicationKey: b2KeyRes.rows[0]?.value || '',
             b2BucketId: b2BucketRes.rows[0]?.value || '',
             b2BucketName: b2NameRes.rows[0]?.value || '',
+            libraryAdmins: libAdminsRes.rows[0]?.value || '',
             flash: null
         });
     } catch (err) {
@@ -1221,6 +1223,20 @@ router.post('/media-settings', async (req, res) => {
         }
 
         await logAudit(req.adminUser, 'update_media_settings', 'system', 'byse');
+        res.redirect('/admin/media-settings?saved=1');
+    } catch (err) {
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+router.post('/media-settings/library', async (req, res) => {
+    try {
+        const { library_admins } = req.body;
+        await db.execute({
+            sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+            args: ['library_admins', library_admins || '']
+        });
+        await logAudit(req.adminUser, 'update_library_settings', 'system', 'library');
         res.redirect('/admin/media-settings?saved=1');
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
