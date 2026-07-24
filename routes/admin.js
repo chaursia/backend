@@ -1257,7 +1257,7 @@ router.get('/library', async (req, res) => {
         const docsRes = await db.execute({
             sql: `SELECT ld.*, u.profile_image as uploader_image
                   FROM library_documents ld
-                  JOIN users u ON ld.user_id = u.id
+                  LEFT JOIN users u ON ld.user_id = u.id
                   ORDER BY ld.created_at DESC`
         });
         res.render('admin-library', {
