@@ -25,6 +25,11 @@ const socialUpload = multer({
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
+const libraryUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for library docs
+});
+
 const router = express.Router();
 
 // Apply admin protection to all routes in this file
@@ -1240,6 +1245,80 @@ router.post('/media-settings/library', async (req, res) => {
         res.redirect('/admin/media-settings?saved=1');
     } catch (err) {
         res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// ─────────────────────────────────────────────
+//  LIBRARY MANAGEMENT
+// ─────────────────────────────────────────────
+
+router.get('/library', async (req, res) => {
+    try {
+        const docsRes = await db.execute({
+            sql: `SELECT ld.*, u.profile_image as uploader_image
+                  FROM library_documents ld
+                  JOIN users u ON ld.user_id = u.id
+                  ORDER BY ld.created_at DESC`
+        });
+        res.render('admin-library', {
+            documents: docsRes.rows || [],
+            flash: req.query.success ? { type: 'success', message: 'Document uploaded successfully' } :
+                   req.query.deleted ? { type: 'success', message: 'Document deleted successfully' } :
+                   req.query.error ? { type: 'error', message: req.query.error } : null
+        });
+    } catch (err) {
+        res.status(500).send('Error loading library: ' + err.message);
+    }
+});
+
+router.post('/library/upload', libraryUpload.single('document'), async (req, res) => {
+    try {
+        const { caption } = req.body;
+        if (!caption || !caption.trim()) {
+            return res.redirect('/admin/library?error=' + encodeURIComponent('Caption is required'));
+        }
+        if (!req.file) {
+            return res.redirect('/admin/library?error=' + encodeURIComponent('File is required'));
+        }
+
+        const { uploadFile: uploadToB2 } = require('../services/b2Service');
+        const result = await uploadToB2(req.file.buffer, req.file.originalname, req.file.mimetype);
+
+        await db.execute({
+            sql: `INSERT INTO library_documents (user_id, user_name, caption, b2_file_name, b2_file_id, mime_type, file_size)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+                0, 'Admin',
+                caption.trim(), result.fileName, result.fileId,
+                req.file.mimetype, req.file.buffer.length
+            ]
+        });
+
+        await logAudit(req.adminUser, 'upload_library_doc', 'library', result.fileName, { caption });
+        res.redirect('/admin/library?success=1');
+    } catch (err) {
+        res.status(500).send('Upload failed: ' + err.message);
+    }
+});
+
+router.post('/library/:id/delete', async (req, res) => {
+    try {
+        const docRes = await db.execute({
+            sql: 'SELECT id, b2_file_name, b2_file_id FROM library_documents WHERE id = ?',
+            args: [req.params.id]
+        });
+        if (docRes.rows.length === 0) {
+            return res.status(404).send('Document not found');
+        }
+        const doc = docRes.rows[0];
+        if (doc.b2_file_id && doc.b2_file_name) {
+            await deleteFromB2(doc.b2_file_id, doc.b2_file_name).catch(e => console.error('B2 delete failed:', e.message));
+        }
+        await db.execute({ sql: 'DELETE FROM library_documents WHERE id = ?', args: [req.params.id] });
+        await logAudit(req.adminUser, 'delete_library_doc', 'library', req.params.id);
+        res.redirect('/admin/library?deleted=1');
+    } catch (err) {
+        res.status(500).send('Delete failed: ' + err.message);
     }
 });
 
