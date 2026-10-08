@@ -2,8 +2,9 @@ const { createServerClient, parseCookieHeader, serializeCookieHeader } = require
 
 /**
  * Creates a Supabase client that reads/writes auth cookies per-request.
- * Used for: signInWithOAuth, exchangeCodeForSession, getUser.
+ * Used for: signInWithPassword, getUser, signOut.
  * Uses SUPABASE_ANON_KEY (not service key) — safe for auth flows.
+ * Admin login uses signInWithPassword; the OAuth flow was removed.
  */
 function createSupabaseServerClient(req, res) {
     return createServerClient(
@@ -19,6 +20,10 @@ function createSupabaseServerClient(req, res) {
                         res.cookie(name, value, {
                             ...options,
                             httpOnly: true,
+                            // Set explicitly rather than relying on the library's
+                            // transitive defaults: the admin session's CSRF
+                            // protection depends on Lax blocking cross-site POSTs.
+                            sameSite: 'lax',
                             secure: process.env.NODE_ENV === 'production',
                         });
                     });

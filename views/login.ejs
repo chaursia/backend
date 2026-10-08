@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login — ITS College</title>
     <meta name="description" content="Secure admin login for ITS College management panel.">
+    <meta name="robots" content="noindex, nofollow">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -62,20 +63,34 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Discord specific styling */
-        .btn-discord {
-            background-color: #5865F2;
-            /* Discord Blurple */
+        /* Login form fields */
+        .field {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 13px 16px;
             color: white;
-            transition: background-color 0.2s, transform 0.1s;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s, background-color 0.2s;
         }
 
-        .btn-discord:hover {
-            background-color: #4752C4;
+        .field::placeholder {
+            color: rgba(255, 255, 255, 0.35);
         }
 
-        .btn-discord:active {
-            transform: scale(0.98);
+        .field:focus {
+            border-color: rgba(59, 130, 246, 0.6);
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .field:-webkit-autofill,
+        .field:-webkit-autofill:hover,
+        .field:-webkit-autofill:focus {
+            -webkit-text-fill-color: white;
+            -webkit-box-shadow: 0 0 0 1000px #1e293b inset;
+            transition: background-color 9999s ease-out;
         }
     </style>
 </head>
@@ -116,33 +131,55 @@
             </div>
             <% } %>
 
-                <!-- Auth Providers -->
-                <div class="space-y-3">
-                    <p class="text-center text-gray-400 text-xs mb-4 uppercase tracking-widest font-bold">Authorized
-                        Logins Only</p>
+                <!-- Credentials -->
+                <form action="/admin/login" method="POST" id="login-form" class="space-y-4" novalidate>
+                    <p class="text-center text-gray-400 text-xs mb-2 uppercase tracking-widest font-bold">
+                        Authorized Personnel Only
+                    </p>
 
-                    <!-- Discord -->
-                    <a href="/admin/auth/discord"
-                        class="btn-auth btn-discord w-full font-semibold py-3.5 rounded-xl flex items-center justify-center gap-3 text-sm shadow-lg shadow-[#5865F2]/20 border border-white/5 active:scale-95 transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
-                            viewBox="0 0 127.14 96.36">
-                            <path
-                                d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.3,46,96.19,53,91.08,65.69,84.69,65.69Z" />
-                        </svg>
-                        <span>Login with Discord</span>
-                    </a>
+                    <div>
+                        <label for="email" class="sr-only">Email address</label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value="<%= typeof email !== 'undefined' && email ? email : '' %>"
+                            placeholder="admin@college.edu"
+                            autocomplete="username"
+                            required
+                            autofocus
+                            maxlength="120"
+                            class="field" />
+                    </div>
 
-                    <!-- GitHub -->
-                    <a href="/admin/auth/github"
-                        class="btn-auth bg-gray-800 hover:bg-black text-white w-full font-semibold py-3.5 rounded-xl flex items-center justify-center gap-3 text-sm shadow-lg shadow-black/20 border border-white/5 active:scale-95 transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
-                            viewBox="0 0 24 24">
-                            <path
-                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                        </svg>
-                        <span>Login with GitHub</span>
-                    </a>
-                </div>
+                    <div class="relative">
+                        <label for="password" class="sr-only">Password</label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Password"
+                            autocomplete="current-password"
+                            required
+                            maxlength="200"
+                            class="field pr-11" />
+                        <button type="button" id="toggle-password"
+                            aria-label="Show password"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                id="eye-icon">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <button type="submit" id="login-btn"
+                        class="w-full font-semibold py-3.5 rounded-xl flex items-center justify-center gap-3 text-sm shadow-lg shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 border border-white/5 active:scale-95 transition-all">
+                        <span id="login-btn-text">Sign In</span>
+                    </button>
+                </form>
 
                 <p
                     class="text-center text-gray-500 text-[10px] mt-8 leading-relaxed uppercase tracking-widest font-medium">
@@ -151,16 +188,37 @@
                 </p>
     </div>
 
-    <!-- Loading State Script -->
+    <!-- Password visibility toggle + submit state -->
     <script>
-        document.querySelectorAll('.btn-auth').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                const span = this.querySelector('span');
-                const originalText = span.textContent;
-                span.textContent = 'Connecting...';
-                this.classList.add('cursor-wait', 'opacity-80', 'pointer-events-none');
-            });
-        });
+        (function () {
+            var toggle = document.getElementById('toggle-password');
+            var password = document.getElementById('password');
+            var eye = document.getElementById('eye-icon');
+
+            if (toggle && password) {
+                toggle.addEventListener('click', function () {
+                    var showing = password.type === 'text';
+                    password.type = showing ? 'password' : 'text';
+                    this.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+                    eye.innerHTML = showing
+                        ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+                        : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+                    password.focus();
+                });
+            }
+
+            var form = document.getElementById('login-form');
+            var btn = document.getElementById('login-btn');
+            var btnText = document.getElementById('login-btn-text');
+
+            if (form && btn) {
+                form.addEventListener('submit', function () {
+                    btn.disabled = true;
+                    btn.classList.add('cursor-wait', 'opacity-70');
+                    if (btnText) btnText.textContent = 'Signing in...';
+                });
+            }
+        })();
     </script>
 </body>
 

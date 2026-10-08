@@ -31,14 +31,10 @@ app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ limit: '200mb', extended: true })); // to parse form bodies
 app.use(cookieParser());
 
-// Global Middleware to catch misplaced Supabase OAuth codes (Whitelist fallback)
-app.use((req, res, next) => {
-    if (req.query.code && (req.path === '/' || req.path === '/admin')) {
-        console.log(`[Smart Redirect] Catching OAuth code at ${req.path}, forwarding to admin callback.`);
-        return res.redirect(`/admin/auth/callback?code=${req.query.code}`);
-    }
-    next();
-});
+// NOTE: the "Smart Redirect" middleware that forwarded a stray ?code= to
+// /admin/auth/callback was removed with the OAuth flow. Admin login is now
+// email + password, so there is no OAuth callback to forward to. It also
+// interpolated an unvalidated query parameter into a Location header.
 
 // Active Request Logger (shows up in your Admin Server Logs)
 app.use((req, res, next) => {

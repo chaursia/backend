@@ -6,6 +6,7 @@ All notable changes to this project made on 2026-04-11 will be documented in thi
 
 ### Added
 - **Discord OAuth Integration**: Implemented secure admin login using Discord via Supabase Auth.
+    - Superseded: admin login now uses email + password (`POST /admin/login`) instead of OAuth. The `/auth/discord`, `/auth/github` and `/auth/callback` routes were removed.
 - **Admin Dashboard**: Created a comprehensive web-based admin panel using EJS templating.
     - Dashboard overview with real-time statistics.
     - User management system (View, Edit, Delete, Ban).

@@ -1,6 +1,6 @@
 const express = require('express');
 const { db, supabase } = require('../db');
-const { requireAdmin } = require('../middleware/adminAuth');
+const { requireAdmin, getAuthorizedAdminEmails } = require('../middleware/adminAuth');
 const { createSupabaseServerClient } = require('../utils/supabaseServer');
 const sysLogger = require('../utils/logger');
 const { logActivity } = require('../utils/activityLogger');
@@ -39,22 +39,11 @@ const libraryUpload = multer({
 
 const router = express.Router();
 
-/**
- * Builds the OAuth redirect URL.
- *
- * Must NOT use req.get('host'): that header is client-supplied, so a request
- * with `Host: attacker.tld` produced a redirectTo pointing at the attacker,
- * which is an admin account-takeover vector if Supabase's redirect allowlist
- * is wildcarded. Requires APP_URL to be configured.
- */
-function getOAuthRedirectUrl() {
-    const base = process.env.APP_URL;
-    if (!base) {
-        console.error('[oauth] APP_URL is not configured. Refusing to build a redirect URL from a request header.');
-        return null;
-    }
-    return `${base.replace(/\/+$/, '')}/admin/auth/callback`;
-}
+// NOTE: getOAuthRedirectUrl() was removed with the Discord/GitHub OAuth flow.
+// Admin login is now email + password, so there is no redirect URL to build and
+// no reliance on the client-supplied Host header (which had allowed a crafted
+// Host to send the OAuth redirect at an attacker's domain).
+// APP_URL is no longer required for admin login.
 
 // Dual AJAX / redirect response helper
 function respondOrRedirect(req, res, redirectUrl, data, err) {
@@ -190,79 +179,91 @@ async function ensureAdminUser() {
 // ─────────────────────────────────────────────
 
 router.get('/login', (req, res) => {
-    res.render('login', { error: req.query.error || null });
-});
-
-router.get('/auth/discord', async (req, res) => {
-    const redirectTo = getOAuthRedirectUrl();
-    if (!redirectTo) {
-        return res.redirect('/admin/login?error=' + encodeURIComponent('Server is not configured for admin login.'));
-    }
-
-    const supabaseServer = createSupabaseServerClient(req, res);
-    const { data, error } = await supabaseServer.auth.signInWithOAuth({
-        provider: 'discord',
-        options: {
-            redirectTo,
-            skipBrowserRedirect: false
-        }
+    res.render('login', {
+        error: req.query.error || null,
+        email: req.query.email || '',
+        next: typeof req.query.next === 'string' && req.query.next.startsWith('/admin')
+            ? req.query.next
+            : null
     });
-    
-    if (error) {
-        return res.redirect('/admin/login?error=' + encodeURIComponent(error.message));
-    }
-
-    if (data && data.url) {
-        return res.redirect(data.url);
-    }
-
-    res.redirect('/admin/login?error=' + encodeURIComponent('Failed to initialize Discord login.'));
 });
 
-router.get('/auth/github', async (req, res) => {
-    const redirectTo = getOAuthRedirectUrl();
-    if (!redirectTo) {
-        return res.redirect('/admin/login?error=' + encodeURIComponent('Server is not configured for admin login.'));
+/**
+ * POST /login — email + password sign-in.
+ *
+ * Replaces the previous Discord/GitHub OAuth flow. Authentication is delegated
+ * to Supabase Auth so the existing cookie-based session and the allowlist in
+ * requireAdmin keep working unchanged; only the credential exchange moved from
+ * an OAuth redirect to a form post.
+ */
+router.post('/login', async (req, res) => {
+    // JSON clients (e.g. the mobile app or a script) get JSON back instead of
+    // a redirect, matching respondOrRedirect's convention elsewhere.
+    const wantsJson = req.xhr || (req.get('Accept') || '').includes('json');
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+
+    if (!email || !password) {
+        const msg = 'Email and password are required.';
+        return wantsJson
+            ? res.status(400).json({ error: msg })
+            : res.redirect('/admin/login?error=' + encodeURIComponent(msg));
     }
 
-    const supabaseServer = createSupabaseServerClient(req, res);
-    const { data, error } = await supabaseServer.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-            redirectTo,
-            skipBrowserRedirect: false
-        }
-    });
-    
-    if (error) {
-        return res.redirect('/admin/login?error=' + encodeURIComponent(error.message));
-    }
-
-    if (data && data.url) {
-        return res.redirect(data.url);
-    }
-
-    res.redirect('/admin/login?error=' + encodeURIComponent('Failed to initialize GitHub login.'));
-});
-
-router.get('/auth/callback', async (req, res) => {
-    const { code } = req.query;
-    if (code) {
+    try {
         const supabaseServer = createSupabaseServerClient(req, res);
-        const { error } = await supabaseServer.auth.exchangeCodeForSession(code);
-        if (error) {
-            console.error('Auth callback error:', error.message);
-            return res.redirect('/admin/login?error=' + encodeURIComponent('Authentication failed: ' + error.message));
+        const { data, error } = await supabaseServer.auth.signInWithPassword({
+            email,
+            password
+        });
+
+        if (error || !data?.user) {
+            // Deliberately vague: do not reveal whether the email exists or the
+            // password was merely wrong.
+            console.warn(`[admin/login] Failed sign-in attempt for ${email}: ${error?.message}`);
+            const msg = 'Invalid email or password.';
+            return wantsJson
+                ? res.status(401).json({ error: msg })
+                : res.redirect('/admin/login?error=' + encodeURIComponent(msg) +
+                    '&email=' + encodeURIComponent(email));
         }
+
+        // Reject non-allowlisted accounts here rather than letting them in and
+        // bouncing them out on the next request.
+        if (!getAuthorizedAdminEmails().includes((data.user.email || '').toLowerCase())) {
+            await supabaseServer.auth.signOut();
+            console.warn(`[admin/login] Access Denied: ${data.user.email}`);
+            const msg = 'Access denied. This account is not authorized for the admin panel.';
+            return wantsJson
+                ? res.status(403).json({ error: msg })
+                : res.redirect('/admin/login?error=' + encodeURIComponent(msg));
+        }
+
+        logActivity('admin_login', 'Admin Login', `${data.user.email} signed in to the admin panel.`, {
+            icon: 'shield',
+            color: 'indigo',
+            metadata: { email: data.user.email }
+        }).catch(() => {});
+
+        await logAudit({ id: data.user.id, email: data.user.email }, 'admin_login', 'admin', data.user.id);
+
+        return wantsJson
+            ? res.json({ success: true })
+            : res.redirect('/admin');
+    } catch (err) {
+        console.error('Admin login error:', err.message);
+        const msg = 'Login failed. Please try again.';
+        return wantsJson
+            ? res.status(500).json({ error: msg })
+            : res.redirect('/admin/login?error=' + encodeURIComponent(msg));
     }
-    res.redirect('/admin');
 });
 
-router.get('/logout', async (req, res) => {
-    const supabaseServer = createSupabaseServerClient(req, res);
-    await supabaseServer.auth.signOut();
-    res.redirect('/admin/login');
-});
+// NOTE: a duplicate `GET /logout` used to be declared here as well. Logout is
+// state-changing, and SameSite=Lax still sends cookies on top-level GET
+// navigation, so a GET logout is trivially triggerable cross-site (an <img> or
+// window.open). Only the POST handler below exists now, and the sidebar posts
+// to it from a form.
 
 // ─────────────────────────────────────────────
 //  DASHBOARD
