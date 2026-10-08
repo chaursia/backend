@@ -1,10 +1,9 @@
 const cloudinary = require('cloudinary').v2;
 
-// Auto-configures using CLOUDINARY_URL environment variable if present.
-// Otherwise, make sure the user added it to .env
-if (process.env.CLOUDINARY_URL) {
-    cloudinary.config(); 
-}
+// Cloudinary configuration is owned by storageService.js. cloudinary.v2 is a
+// singleton, so configuring it here as well meant whichever module loaded last
+// silently overwrote the other's credentials.
+require('./storageService').configureCloudinary();
 
 /**
  * Uploads a file buffer to Cloudinary
@@ -26,8 +25,10 @@ const uploadToCloudinary = (buffer, mimeType) => {
             },
             (error, result) => {
                 if (error) {
-                    console.error("Cloudinary Upload Error:", error);
-                    return reject(error);
+                    // Genericised: the raw provider error can echo request
+                    // credentials in its payload and was returned to clients.
+                    console.error("Cloudinary Upload Error:", error && error.message);
+                    return reject(new Error('Upload failed.'));
                 }
                 resolve({
                     url: result.secure_url,
@@ -42,11 +43,24 @@ const uploadToCloudinary = (buffer, mimeType) => {
 };
 
 const deleteFromCloudinary = async (publicId, resourceType = 'image') => {
+    if (!publicId) return;
+
+    // publicId came from client-controlled post metadata, so constrain its shape
+    // before it reaches the destroy API.
+    if (typeof publicId !== 'string' || publicId.length > 512 || /[\u0000-\u001f]/.test(publicId)) {
+        console.warn('Cloudinary delete skipped: invalid public_id');
+        return;
+    }
+
     try {
-        if (!publicId) return;
-        await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+        const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+        // destroy() resolves with { result: 'ok' | 'not found' } rather than
+        // throwing, so the previous version reported success unconditionally.
+        if (!result || result.result !== 'ok') {
+            console.warn(`Cloudinary delete did not succeed for "${publicId}": ${result && result.result}`);
+        }
     } catch (e) {
-        console.error("Failed to delete from Cloudinary:", e);
+        console.error("Failed to delete from Cloudinary:", e && e.message);
     }
 };
 

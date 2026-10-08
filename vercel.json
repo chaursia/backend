@@ -9,5 +9,11 @@
     "api/index.js": {
       "includeFiles": "views/**,config/**,routes/**,services/**,middleware/**,utils/**"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/internal/cleanup-chat",
+      "schedule": "0 * * * *"
+    }
+  ]
 }

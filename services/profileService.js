@@ -26,11 +26,14 @@ async function completeProfile(userId, profileImage, idCardImage, confirmedBarco
     const barcode = confirmedBarcode || await readBarcode(idCardImage.buffer);
 
     if (!barcode) {
+        // idCardUrl is deliberately omitted. It previously handed the caller a
+        // permanent URL to their own ID card scan even though the scan failed,
+        // leaking a sensitive identity document to a device that could not
+        // read it. The caller can retry with manual entry instead.
         return {
             success: false,
             message: "Barcode not detected. Please try again or use manual scan.",
-            profileImageUrl,
-            idCardUrl
+            profileImageUrl
         };
     }
 

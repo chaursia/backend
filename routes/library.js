@@ -13,6 +13,26 @@ const handleError = (res, error) => {
 };
 
 const MAX_DOCS_PER_USER = 20;
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB, matches the upload limit
+
+/**
+ * Validates a client-supplied B2 object name for a library document.
+ *
+ * The name is later used to build a signed download URL and to call
+ * deleteFromB2(), so it must be constrained to this app's own prefix and must
+ * not attempt traversal.
+ */
+function sanitizeLibraryFileName(rawName) {
+    if (typeof rawName !== 'string') return null;
+    const name = rawName.trim();
+    if (!name || name.length > 512) return null;
+    if (name.includes('..') || name.includes('//')) return null;
+    // eslint-disable-next-line no-control-regex
+    if (/[\u0000-\u001f\u007f]/.test(name)) return null;
+    if (name.startsWith('/')) return null;
+    if (!name.toLowerCase().startsWith('library_documents/')) return null;
+    return name;
+}
 
 async function isAdmin(userId) {
     const configRes = await db.execute({
@@ -75,6 +95,28 @@ router.post('/documents', async (req, res) => {
             return res.status(400).json({ error: 'File name is required.' });
         }
 
+        // caption, b2_file_name, b2_file_id, mime_type and file_size all arrive
+        // from the client. The file name is constrained to this app's own prefix
+        // (the same value is later passed to deleteFromB2 and to the signed
+        // download URL), and lengths/sizes are validated instead of trusted.
+        const safeFileName = sanitizeLibraryFileName(b2_file_name);
+        if (!safeFileName) {
+            return res.status(400).json({ error: 'Invalid file name.' });
+        }
+        if (typeof caption !== 'string' || caption.trim().length === 0) {
+            return res.status(400).json({ error: 'Caption is required.' });
+        }
+        if (caption.length > 300) {
+            return res.status(400).json({ error: 'Caption is too long (max 300 characters).' });
+        }
+        if (typeof mime_type === 'string' && !/^[a-z]+\/[a-z0-9.+-]{1,100}$/i.test(mime_type)) {
+            return res.status(400).json({ error: 'Invalid MIME type.' });
+        }
+        const parsedSize = Number(file_size);
+        if (file_size != null && (!Number.isFinite(parsedSize) || parsedSize < 0 || parsedSize > MAX_FILE_SIZE_BYTES)) {
+            return res.status(400).json({ error: 'Invalid file size.' });
+        }
+
         // Check per-user limit (admins bypass)
         const adminUser = await isAdmin(req.user.id);
         if (!adminUser) {
@@ -93,8 +135,9 @@ router.post('/documents', async (req, res) => {
                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 req.user.id, req.user.name || 'Unknown',
-                caption.trim(), b2_file_name, b2_file_id || null,
-                mime_type || 'application/octet-stream', file_size || 0
+                caption.trim(), safeFileName, b2_file_id || null,
+                mime_type || 'application/octet-stream',
+                Number.isFinite(parsedSize) ? Math.floor(parsedSize) : 0
             ]
         });
 
@@ -114,7 +157,8 @@ router.get('/documents', async (req, res) => {
             sql: `SELECT ld.*, u.profile_image as uploader_image
                   FROM library_documents ld
                   LEFT JOIN users u ON ld.user_id = u.id
-                  ORDER BY ld.created_at DESC`
+                  ORDER BY ld.created_at DESC
+                  LIMIT 200`
         });
         res.json({ documents: docsRes.rows });
     } catch (error) { handleError(res, error); }
@@ -138,9 +182,15 @@ router.delete('/documents/:id', async (req, res) => {
 
         const doc = docRes.rows[0];
 
-        // Delete from B2
+        // Delete from B2. Re-validate the stored name: it originated from
+        // req.body, so older rows may contain an out-of-prefix value.
         if (doc.b2_file_id && doc.b2_file_name) {
-            await deleteFromB2(doc.b2_file_id, doc.b2_file_name).catch(e => console.error('B2 delete failed:', e.message));
+            const safeName = sanitizeLibraryFileName(doc.b2_file_name);
+            if (safeName) {
+                await deleteFromB2(doc.b2_file_id, safeName).catch(e => console.error('B2 delete failed:', e.message));
+            } else {
+                console.warn(`B2 delete skipped for document ${req.params.id}: disallowed name "${doc.b2_file_name}"`);
+            }
         }
 
         await db.execute({
@@ -157,10 +207,23 @@ router.get('/download', async (req, res) => {
     try {
         const fileName = req.query.fileName;
         if (!fileName) return res.status(400).json({ error: 'Missing fileName query parameter' });
-        const downloadUrl = await getB2DownloadUrl(fileName);
-        res.json({ url: downloadUrl, fileName: fileName });
+
+        // BOLA guard. The raw query value used to be passed straight to
+        // getB2DownloadUrl(), so any authenticated student could mint a signed
+        // URL for any object in the bucket. Constrain to this app's prefix.
+        const safeName = sanitizeLibraryFileName(String(fileName));
+        if (!safeName) {
+            return res.status(403).json({ error: 'Access denied for this file.' });
+        }
+
+        const downloadUrl = await getB2DownloadUrl(safeName);
+        if (!downloadUrl) return res.status(404).json({ error: 'File not found.' });
+
+        // Deliberately not echoing the raw client input.
+        res.json({ url: downloadUrl, fileName: safeName });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        console.error('Library download failed:', e.message);
+        res.status(500).json({ error: 'Failed to generate download URL.' });
     }
 });
 

@@ -73,6 +73,8 @@ async function initDb() {
       "ALTER TABLE chat_messages ADD COLUMN section TEXT",
       "ALTER TABLE chat_messages ADD COLUMN verify_badge INTEGER DEFAULT 0",
       "ALTER TABLE users ADD COLUMN verify_badge INTEGER DEFAULT 0",
+      "ALTER TABLE chat_bans ADD COLUMN is_active INTEGER DEFAULT 1",
+      "ALTER TABLE chat_bans ADD COLUMN expires_at DATETIME",
       "ALTER TABLE social_posts ADD COLUMN video_url TEXT",
       "ALTER TABLE social_posts ADD COLUMN video_file_id TEXT",
       "ALTER TABLE social_posts ADD COLUMN video_thumbnail TEXT",
@@ -170,9 +172,17 @@ async function initDb() {
         user_id INTEGER PRIMARY KEY,
         banned_by INTEGER,
         reason TEXT,
+        is_active INTEGER DEFAULT 1,
+        expires_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Index for the barcode lookup performed by /id/scanQR. Without this, every
+    // physical-barcode scan was a full table scan of users.
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_users_barcode_id ON users(barcode_id);
+    `).catch(() => { /* index already exists */ });
 
     console.log('✅ Database initialized successfully');
   } catch (error) {

@@ -105,17 +105,51 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('\n🚨 FATAL CRASH: Unhandled Promise Rejection 🚨\n', reason);
 });
 
+/**
+ * Deletes chat messages older than 7 days.
+ *
+ * Exposed as a route (guarded by a shared secret) so it can be driven by Vercel
+ * Cron in production. It previously lived inside `if (require.main === module)`,
+ * which is false under Vercel because every request is routed through
+ * api/index.js — so chat_messages grew without bound forever in production.
+ */
+const CLEANUP_SECRET = process.env.CLEANUP_SECRET;
+
+app.post('/internal/cleanup-chat', async (req, res) => {
+    // If no secret is configured the endpoint stays disabled rather than open.
+    if (!CLEANUP_SECRET) {
+        return res.status(503).json({ error: 'Cleanup endpoint not configured.' });
+    }
+    const provided = req.headers['x-cleanup-secret'] || req.query.secret;
+    if (!provided || provided !== CLEANUP_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized.' });
+    }
+
+    try {
+        const { db } = require('./db');
+        const result = await db.execute({
+            sql: "DELETE FROM chat_messages WHERE created_at < datetime('now', '-7 days')"
+        });
+        console.log(`🧹 Cleaned ${result.rowsAffected || 0} old chat messages (>7 days)`);
+        res.json({ success: true, deleted: result.rowsAffected || 0 });
+    } catch (e) {
+        console.error('Chat cleanup failed:', e.message);
+        res.status(500).json({ error: 'Cleanup failed.' });
+    }
+});
+
 if (require.main === module) {
     app.listen(PORT, () => {
         console.log(`✅ Production-Ready Refactored Backend Server running on http://localhost:${PORT}`);
-        
+
         // Log startup to activity feed
         logActivity('system', 'System Online', 'Backend server started successfully.', {
             icon: 'zap',
             color: 'green'
         }).catch(() => {});
 
-        // Auto-delete chat messages older than 7 days (every hour)
+        // Local/dev retention sweep. In production this runs via Vercel Cron
+        // against /internal/cleanup-chat (see vercel.json crons).
         const { db } = require('./db');
         async function cleanOldMessages() {
             try {

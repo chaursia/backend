@@ -1,5 +1,6 @@
 const express = require('express');
-const { supabase } = require('../db');
+const { db, supabase } = require('../db');
+const sessionStore = require('../utils/sessionStore');
 
 const router = express.Router();
 
@@ -47,24 +48,30 @@ router.get('/version', async (req, res) => {
 // Public endpoint for the mobile app to check UI toggles & maintenance status
 router.get('/features', async (req, res) => {
     try {
+        // Explicit column allow-list. `select('*')` published the entire
+        // feature_settings row unauthenticated, so any internal column added
+        // later (admin notes, config) would leak automatically.
         const { data, error } = await supabase
             .from('feature_settings')
-            .select('*')
+            .select('qr_enabled, barcode_enabled, login_enabled, maintenance_mode, maintenance_message')
             .eq('id', 1)
             .single();
 
         if (error) throw error;
-        
+
         return res.json(data);
     } catch (e) {
         console.error('CRITICAL: Feature check failed:', e.message);
-        // Fallback to fully permissive state if DB is unreachable to prevent app lockouts
+        // Fail CLOSED. This previously returned a fully permissive state, so
+        // anyone who could induce a Supabase error disabled the admin kill
+        // switch for every client that trusts this endpoint. Maintenance mode
+        // and disabled-login are the safe defaults during an outage.
         return res.json({
-            qr_enabled: true,
-            barcode_enabled: true,
+            qr_enabled: false,
+            barcode_enabled: false,
             login_enabled: true,
-            maintenance_mode: false,
-            maintenance_message: ""
+            maintenance_mode: true,
+            maintenance_message: "Unable to reach the server. Please try again shortly."
         });
     }
 });
@@ -78,11 +85,60 @@ router.get('/announcements', async (req, res) => {
             .from('announcements')
             .select('id, title, body, target_course, target_branch, target_semester, publish_at')
             .or(`publish_at.is.null,publish_at.lte.${now}`)
-            .order('publish_at', { ascending: false, nullsFirst: true });
+            .order('publish_at', { ascending: false, nullsFirst: true })
+            // Bounded: this previously returned every announcement ever published.
+            .limit(100);
 
         if (error) throw error;
-        
-        return res.json(data || []);
+
+        // Audience scoping. target_course / target_branch / target_semester were
+        // returned to every caller, disclosing announcements aimed at other
+        // sections and years. Untargeted announcements (all three null/empty) go
+        // to everyone; otherwise the caller's own course/branch/semester must match.
+        let rows = data || [];
+
+        const sessionId = req.headers['x-session-id'] || req.headers['authorization'];
+        let caller = null;
+
+        if (sessionId) {
+            try {
+                let sid = String(sessionId);
+                if (sid.toLowerCase().startsWith('bearer ')) sid = sid.slice(7);
+                const session = sessionStore.decrypt(sid);
+                if (session && session.user_id) {
+                    const userRes = await db.execute({
+                        sql: 'SELECT course, branch, semester FROM users WHERE id = ?',
+                        args: [session.user_id]
+                    });
+                    if (userRes.rows.length > 0) caller = userRes.rows[0];
+                }
+            } catch (e) {
+                // Unreadable session: treat as anonymous rather than failing the request.
+                caller = null;
+            }
+        }
+
+        const normalise = (v) => (v == null ? '' : String(v).trim().toLowerCase());
+
+        rows = rows.filter(row => {
+            const hasTarget = normalise(row.target_course) || normalise(row.target_branch) || normalise(row.target_semester);
+            if (!hasTarget) return true; // broadcast
+
+            // Targeted content requires a known caller; otherwise withhold it.
+            if (!caller) return false;
+
+            const targetCourse = normalise(row.target_course);
+            const targetBranch = normalise(row.target_branch);
+            const targetSemester = normalise(row.target_semester);
+
+            if (targetCourse && !normalise(caller.course).includes(targetCourse) && !targetCourse.includes(normalise(caller.course))) return false;
+            if (targetBranch && !normalise(caller.branch).includes(targetBranch) && !targetBranch.includes(normalise(caller.branch))) return false;
+            if (targetSemester && normalise(caller.semester) !== targetSemester) return false;
+
+            return true;
+        });
+
+        return res.json(rows);
     } catch (e) {
         console.error('Announcements fetch failed:', e.message);
         return res.json([]);

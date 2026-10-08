@@ -10,15 +10,23 @@ const AUTHORIZED_ADMINS = {
  * Middleware to protect /admin/* routes using Supabase SSR session cookies.
  */
 async function requireAdmin(req, res, next) {
-    const path = req.path || '';
-    
-    // Allow public auth paths through
-    const isPublic = path.includes('/login') || 
-                     path.includes('/auth/discord') || 
-                     path.includes('/auth/github') || 
-                     path.includes('/auth/callback');
+    // Exact-match allowlist.
+    //
+    // This previously used `path.includes(...)`, which matches any path
+    // containing those substrings in an attacker-controlled position. Inside
+    // router.use() req.path is router-relative, so substituting a `:id`
+    // parameter with "login" bypassed authentication on 17 handlers
+    // (e.g. POST /users/:id/action, POST /social/post/:id/delete).
+    const PUBLIC_PATHS = new Set([
+        '/login',
+        '/auth/discord',
+        '/auth/github',
+        '/auth/callback'
+    ]);
 
-    if (isPublic) return next();
+    const path = req.path || '';
+
+    if (PUBLIC_PATHS.has(path)) return next();
 
     try {
         const supabaseServer = createSupabaseServerClient(req, res);
@@ -38,9 +46,9 @@ async function requireAdmin(req, res, next) {
             console.warn(`[requireAdmin] Access Denied: Provider ${provider}, Email ${userEmail}`);
             // Clear stale session
             await supabaseServer.auth.signOut();
-            return res.render('login', {
-                error: `Access denied. Your ${provider} account (${userEmail}) is not authorized for this action.`
-            });
+            return res.redirect('/admin/login?error=' + encodeURIComponent(
+                'Access denied. Your account is not authorized for this action.'
+            ));
         }
 
         req.adminUser = user;

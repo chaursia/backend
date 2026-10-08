@@ -1,5 +1,6 @@
 const express = require('express');
 const { secureFetch } = require('../services/apiService');
+const { loadAcademicSession } = require('../config/appConfig');
 
 const router = express.Router();
 
@@ -107,11 +108,19 @@ router.get('/attendance/overall', async (req, res) => {
 // GET /api/attendance/monthly
 router.get('/attendance/monthly', async (req, res) => {
     try {
-        const { month, session = "2025-2026" } = req.query;
+        const { month } = req.query;
         if (!month) {
             return res.status(400).json({ error: 'Missing required query parameter "month".' });
         }
-        const data = await secureFetch(`/my/attendances?month=${month}&session=${session}`, req.sessionId, res);
+        // The app only sends `month`, so the session must be resolved server-side.
+        // It was hardcoded to "2025-2026", which had expired; the college API
+        // returns no rows for a stale academic year, so the app rendered
+        // "No history for this month." with no error anywhere.
+        const session = await loadAcademicSession(req.query.session);
+        const data = await secureFetch(
+            `/my/attendances?month=${encodeURIComponent(month)}&session=${encodeURIComponent(session)}`,
+            req.sessionId, res
+        );
         res.json(data);
     } catch (error) { handleError(res, error); }
 });
@@ -135,8 +144,14 @@ router.get('/information', async (req, res) => {
 // GET /api/timetable
 router.get('/timetable', async (req, res) => {
     try {
-        const { session = "2025-2026", id = "14" } = req.query;
-        const data = await secureFetch(`/student/timetables/${session}/${id}`, req.sessionId, res);
+        // Same stale-session problem as /attendance/monthly: timetable data is
+        // keyed by academic year, so "2025-2026" returned nothing.
+        const session = await loadAcademicSession(req.query.session);
+        const { id = "14" } = req.query;
+        const data = await secureFetch(
+            `/student/timetables/${encodeURIComponent(session)}/${encodeURIComponent(id)}`,
+            req.sessionId, res
+        );
         res.json(data);
     } catch (error) { handleError(res, error); }
 });
@@ -159,8 +174,12 @@ router.get('/calendar', async (req, res) => {
             return res.json({ source: 'custom', events: eventsRes.rows });
         }
 
-        const { session = "2025-2026", title = "" } = req.query;
-        const data = await secureFetch(`/student/calendardayslist/${session}?title=${title}`, req.sessionId, res);
+        const session = await loadAcademicSession(req.query.session);
+        const title = req.query.title || "";
+        const data = await secureFetch(
+            `/student/calendardayslist/${encodeURIComponent(session)}?title=${encodeURIComponent(title)}`,
+            req.sessionId, res
+        );
         data.source = 'proxied';
         res.json(data);
     } catch (error) { handleError(res, error); }

@@ -4,6 +4,13 @@ const { requireAdmin } = require('../middleware/adminAuth');
 const { createSupabaseServerClient } = require('../utils/supabaseServer');
 const sysLogger = require('../utils/logger');
 const { logActivity } = require('../utils/activityLogger');
+const {
+    loadAcademicSession,
+    deriveAcademicSession,
+    invalidateAcademicSession,
+    ACADEMIC_SESSION_KEY,
+    isValidAcademicSession
+} = require('../config/appConfig');
 const { sendBulkEmail, sendPersonalizedEmail, checkSmtpConnection } = require('../utils/mailer');
 const multer = require('multer');
 const fs = require('fs');
@@ -31,6 +38,23 @@ const libraryUpload = multer({
 });
 
 const router = express.Router();
+
+/**
+ * Builds the OAuth redirect URL.
+ *
+ * Must NOT use req.get('host'): that header is client-supplied, so a request
+ * with `Host: attacker.tld` produced a redirectTo pointing at the attacker,
+ * which is an admin account-takeover vector if Supabase's redirect allowlist
+ * is wildcarded. Requires APP_URL to be configured.
+ */
+function getOAuthRedirectUrl() {
+    const base = process.env.APP_URL;
+    if (!base) {
+        console.error('[oauth] APP_URL is not configured. Refusing to build a redirect URL from a request header.');
+        return null;
+    }
+    return `${base.replace(/\/+$/, '')}/admin/auth/callback`;
+}
 
 // Dual AJAX / redirect response helper
 function respondOrRedirect(req, res, redirectUrl, data, err) {
@@ -170,11 +194,16 @@ router.get('/login', (req, res) => {
 });
 
 router.get('/auth/discord', async (req, res) => {
+    const redirectTo = getOAuthRedirectUrl();
+    if (!redirectTo) {
+        return res.redirect('/admin/login?error=' + encodeURIComponent('Server is not configured for admin login.'));
+    }
+
     const supabaseServer = createSupabaseServerClient(req, res);
     const { data, error } = await supabaseServer.auth.signInWithOAuth({
         provider: 'discord',
         options: {
-            redirectTo: `${req.protocol}://${req.get('host')}/admin/auth/callback`,
+            redirectTo,
             skipBrowserRedirect: false
         }
     });
@@ -191,15 +220,20 @@ router.get('/auth/discord', async (req, res) => {
 });
 
 router.get('/auth/github', async (req, res) => {
+    const redirectTo = getOAuthRedirectUrl();
+    if (!redirectTo) {
+        return res.redirect('/admin/login?error=' + encodeURIComponent('Server is not configured for admin login.'));
+    }
+
     const supabaseServer = createSupabaseServerClient(req, res);
     const { data, error } = await supabaseServer.auth.signInWithOAuth({
         provider: 'github',
         options: {
-            redirectTo: `${req.protocol}://${req.get('host')}/admin/auth/callback`,
+            redirectTo,
             skipBrowserRedirect: false
         }
     });
-
+    
     if (error) {
         return res.redirect('/admin/login?error=' + encodeURIComponent(error.message));
     }
@@ -276,7 +310,14 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.get('/logout', async (req, res) => {
+// NOTE: a byte-identical `GET /logout` was previously declared twice in this
+// file (the first registration always won). Only one remains. It is a
+// state-changing GET, so the logout link should be a POST — see below.
+
+// POST /logout — state-changing logout that cannot be triggered by a
+// cross-site link or an <img> tag (SameSite=Lax still permits top-level GET
+// navigation with cookies).
+router.post('/logout', async (req, res) => {
     const supabaseServer = createSupabaseServerClient(req, res);
     await supabaseServer.auth.signOut();
     res.redirect('/admin/login');
@@ -1202,16 +1243,26 @@ router.post('/social/report/:id/dismiss', async (req, res) => {
 
 router.get('/app-settings', async (req, res) => {
     try {
-        const { data: settings, error } = await supabase
-            .from('feature_settings')
-            .select('*')
-            .eq('id', 1)
-            .single();
+        const [settingsRes, sessionRes] = await Promise.all([
+            supabase.from('feature_settings').select('*').eq('id', 1).single(),
+            db.execute({
+                sql: 'SELECT value FROM app_config WHERE key = ?',
+                args: [ACADEMIC_SESSION_KEY]
+            })
+        ]);
 
-        if (error) throw error;
+        if (settingsRes.error) throw settingsRes.error;
 
-        res.render('app-settings', { 
-            settings: settings || {},
+        // Always show a usable value: the saved one if present, otherwise the
+        // currently-derived session so the field is never blank.
+        const savedSession = sessionRes.rows[0]?.value || '';
+        const activeSession = isValidAcademicSession(savedSession)
+            ? savedSession.trim()
+            : deriveAcademicSession();
+
+        res.render('app-settings', {
+            settings: settingsRes.data || {},
+            academicSession: activeSession,
             flash: req.query.success ? { type: 'success', message: 'Settings updated successfully' } : null
         });
     } catch (err) {
@@ -1221,7 +1272,14 @@ router.get('/app-settings', async (req, res) => {
 });
 
 router.post('/app-settings', async (req, res) => {
-    const { qr_enabled, barcode_enabled, login_enabled, maintenance_mode, maintenance_message } = req.body;
+    const {
+        qr_enabled,
+        barcode_enabled,
+        login_enabled,
+        maintenance_mode,
+        maintenance_message,
+        academic_session
+    } = req.body;
     
     try {
         const updateData = {
@@ -1240,6 +1298,35 @@ router.post('/app-settings', async (req, res) => {
             .eq('id', 1);
 
         if (error) throw error;
+
+        // Persist the academic session so it can be changed from this panel
+        // instead of requiring an env-var redeploy. Validated before writing: a
+        // malformed value would silently break attendance, timetable and
+        // calendar lookups, which is exactly the failure this setting exists to
+        // prevent.
+        if (academic_session != null && String(academic_session).trim() !== '') {
+            if (!isValidAcademicSession(academic_session)) {
+                const msg = 'Invalid academic session. Use the format YYYY-YYYY, e.g. 2026-2027.';
+                if (req.xhr || req.get('Accept')?.includes('json')) {
+                    return res.status(400).json({ error: msg });
+                }
+                return res.status(400).send(msg);
+            }
+
+            const value = String(academic_session).trim();
+            await db.execute({
+                sql: 'INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+                args: [ACADEMIC_SESSION_KEY, value]
+            });
+
+            // Drop the in-memory cache so the change applies to the very next
+            // request rather than after the TTL.
+            invalidateAcademicSession();
+
+            await logAudit(req.adminUser, 'update_academic_session', 'system', 'app_config', {
+                academic_session: value
+            });
+        }
 
         await logAudit(req.adminUser, 'update_app_settings', 'system', '1', updateData);
 
@@ -1660,7 +1747,10 @@ router.get('/calendar', async (req, res) => {
 
         if (calSource === 'proxied') {
             try {
-                const proxiedRes = await fetch(`${API_BASE}/student/calendardayslist/2025-2026?title=${encodeURIComponent(search)}`, {
+                // Was hardcoded to 2025-2026, so the admin calendar proxy returned
+                // nothing once that session ended.
+                const session = await loadAcademicSession();
+                const proxiedRes = await fetch(`${API_BASE}/student/calendardayslist/${encodeURIComponent(session)}?title=${encodeURIComponent(search)}`, {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 if (proxiedRes.ok) {

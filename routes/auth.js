@@ -1,5 +1,8 @@
 const express = require('express');
-const { checkConnection, supabase } = require('../db');
+// NOTE: `db` must be imported here. The DAU update below referenced a bare
+// `db.execute(...)` while only { checkConnection, supabase } were destructured,
+// so it always threw ReferenceError into an empty catch and silently did nothing.
+const { db, checkConnection, supabase } = require('../db');
 const { loginAndSync, getUserById } = require('../services/authService');
 const sessionStore = require('../utils/sessionStore');
 const { logActivity } = require('../utils/activityLogger');
@@ -118,13 +121,11 @@ router.get('/me', async (req, res) => {
 
     console.log(`📡 Fetching personal profile for user_id: ${session.user_id}`);
 
-    // Lazy update DAU
-    try {
-        db.execute({
-            sql: "UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?",
-            args: [session.user_id]
-        }).catch(() => { });
-    } catch (err) { }
+    // Lazy DAU update. Fire-and-forget so it never delays the response.
+    db.execute({
+        sql: "UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE id = ?",
+        args: [session.user_id]
+    }).catch(() => { });
 
     try {
         const user = await getUserById(session.user_id);

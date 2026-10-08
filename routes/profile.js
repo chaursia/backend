@@ -71,8 +71,11 @@ router.post('/complete', authenticate, upload.fields([
 
         const result = await completeProfile(req.userId, profileImage, idCardImage, confirmedBarcode);
         
+        // Return 422 on failure. This previously answered 200 even when
+        // result.success was false, so the client could not distinguish
+        // "barcode not detected" from success by status code.
         if (!result.success) {
-            return res.status(200).json(result);
+            return res.status(422).json(result);
         }
 
         res.json(result);
